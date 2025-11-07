@@ -31,9 +31,45 @@ The app uses Flutter flavors to manage different environments:
 ## 🛠️ Getting Started
 
 ### Prerequisites
-- Flutter SDK (latest stable version)
+- FVM (Flutter Version Manager) - **Recommended**
+- Or Flutter SDK (3.35.7+ required)
 - Dart SDK  
 - Android Studio / Xcode (for device testing)
+
+### FVM Setup (Recommended)
+
+This project uses **FVM (Flutter Version Manager)** to ensure consistent Flutter versions across all developers.
+
+#### 1. Install FVM
+
+**macOS (using Homebrew)**
+```bash
+brew tap leoafarias/fvm
+brew install fvm
+```
+
+**Other platforms**
+```bash
+dart pub global activate fvm
+```
+
+#### 2. Install Project Flutter Version
+```bash
+# This will read the .fvmrc file and install Flutter 3.35.7
+fvm install
+
+# Use the project's Flutter version
+fvm use
+```
+
+#### 3. Verify FVM Setup
+```bash
+# Check FVM status
+fvm list
+
+# Check Flutter version (should show 3.35.7)
+fvm flutter --version
+```
 
 ### Installation
 
@@ -43,7 +79,16 @@ The app uses Flutter flavors to manage different environments:
    cd ouro_pay_consumer_app
    ```
 
-2. **Set up environment configuration**
+2. **Setup Flutter version with FVM** (Recommended)
+   ```bash
+   # Install the project's Flutter version (reads from .fvmrc)
+   fvm install
+   
+   # Use the project's Flutter version
+   fvm use
+   ```
+
+3. **Set up environment configuration**
    ```bash
    # Copy example to create your environment files
    cp .env.example .env.development
@@ -53,17 +98,27 @@ The app uses Flutter flavors to manage different environments:
    # Edit .env.development and .env.production with your API keys, URLs, etc.
    ```
 
-3. **Install dependencies**
+4. **Install dependencies**
    ```bash
+   # Using FVM (recommended)
+   fvm flutter pub get
+   
+   # Or using system Flutter
    flutter pub get
-   # or
+   
+   # Or using Make
    make deps
    ```
 
-4. **Verify Flutter installation**
+5. **Verify Flutter installation**
    ```bash
+   # Using FVM (recommended)
+   fvm flutter doctor
+   
+   # Or using system Flutter
    flutter doctor
-   # or  
+   
+   # Or using Make  
    make doctor
    ```
 
@@ -83,7 +138,23 @@ make dev-ios
 make prod-ios
 ```
 
-### Using Flutter Commands
+### Using FVM Commands (Recommended)
+
+```bash
+# Development flavor
+fvm flutter run --flavor development --target lib/main_dev.dart
+
+# Production flavor
+fvm flutter run --flavor production --target lib/main_prod.dart
+
+# Run on specific device
+fvm flutter run --flavor development --target lib/main_dev.dart -d <device-id>
+
+# Run with hot reload enabled
+fvm flutter run --flavor development --target lib/main_dev.dart --hot
+```
+
+### Using Flutter Commands (Alternative)
 
 ```bash
 # Development flavor
@@ -106,28 +177,32 @@ Use the configured launch configurations in `.vscode/launch.json`:
 ### Android
 
 ```bash
-# Development APK
-make build-dev-android
-# or
-flutter build apk --flavor development --target lib/main_dev.dart
+# Using Make (recommended)
+make build-dev-android    # Development APK
+make build-prod-android   # Production APK
 
-# Production APK  
-make build-prod-android
-# or
+# Using FVM (recommended for manual builds)
+fvm flutter build apk --flavor development --target lib/main_dev.dart
+fvm flutter build apk --flavor production --target lib/main_prod.dart
+
+# Using system Flutter (alternative)
+flutter build apk --flavor development --target lib/main_dev.dart
 flutter build apk --flavor production --target lib/main_prod.dart
 ```
 
 ### iOS
 
 ```bash
-# Development IPA
-make build-dev-ios
-# or  
-flutter build ios --flavor development --target lib/main_dev.dart --no-codesign
+# Using Make (recommended)
+make build-dev-ios     # Development IPA
+make build-prod-ios    # Production IPA
 
-# Production IPA
-make build-prod-ios
-# or
+# Using FVM (recommended for manual builds)
+fvm flutter build ios --flavor development --target lib/main_dev.dart --no-codesign
+fvm flutter build ios --flavor production --target lib/main_prod.dart --no-codesign
+
+# Using system Flutter (alternative)
+flutter build ios --flavor development --target lib/main_dev.dart --no-codesign
 flutter build ios --flavor production --target lib/main_prod.dart --no-codesign
 ```
 
@@ -152,17 +227,67 @@ flutter build ios --flavor production --target lib/main_prod.dart --no-codesign
 ### Development Tools
 - `.vscode/launch.json` - VS Code debug configurations
 - `Makefile` - Development commands
+- `.fvmrc` - FVM Flutter version configuration
+
+## 🎯 FVM Usage Guide
+
+### Why Use FVM?
+- **Version Consistency**: Ensures all team members use the same Flutter version (3.35.7)
+- **Project Isolation**: Different projects can use different Flutter versions
+- **Easy Switching**: Switch between Flutter versions instantly
+- **CI/CD Compatible**: Automated builds use exact same version as local development
+
+### FVM Commands Reference
+
+```bash
+# Check current project's Flutter version
+fvm flutter --version
+
+# List all installed Flutter versions
+fvm list
+
+# Install a specific Flutter version
+fvm install 3.35.7
+
+# Use a specific version for current project
+fvm use 3.35.7
+
+# Run any Flutter command with FVM
+fvm flutter <command>
+
+# Examples:
+fvm flutter pub get
+fvm flutter clean
+fvm flutter build apk
+fvm flutter test
+```
+
+### FVM Configuration Files
+- `.fvmrc` - Specifies Flutter version (3.35.7) for this project
+- This file is committed to git to ensure team consistency
+
+### Switching Between FVM and System Flutter
+```bash
+# Check which Flutter you're using
+which flutter
+
+# Use FVM Flutter (project-specific)
+fvm flutter --version
+
+# Use system Flutter (global)
+flutter --version
+```
 
 ## 🔧 Available Make Commands
 
-Run `make help` to see all available commands:
+Run `make help` to see all available commands. **Note**: All Make commands use FVM automatically.
 
-- `make deps` - Get Flutter dependencies
-- `make clean` - Clean build files  
-- `make doctor` - Run Flutter doctor
-- `make dev` - Run development flavor
-- `make prod` - Run production flavor
-- `make dev-ios` - Run development flavor on iOS  
+- `make deps` - Get Flutter dependencies (uses `fvm flutter pub get`)
+- `make clean` - Clean build files (uses `fvm flutter clean`)
+- `make doctor` - Run Flutter doctor (uses `fvm flutter doctor`)
+- `make dev` - Run development flavor (uses `fvm flutter run`)
+- `make prod` - Run production flavor (uses `fvm flutter run`)
+- `make dev-ios` - Run development flavor on iOS
 - `make prod-ios` - Run production flavor on iOS
 - `make build-dev-android` - Build development APK
 - `make build-prod-android` - Build production APK
@@ -206,6 +331,58 @@ The application uses environment files to manage configuration across different 
 - Minimal retry attempts
 - Professional blue color scheme
 - Enhanced security features (SSL pinning, crash reporting)
+
+## 🔍 Troubleshooting
+
+### FVM Issues
+
+**FVM not found**
+```bash
+# Install FVM first
+brew install fvm  # macOS
+# or
+dart pub global activate fvm
+```
+
+**Wrong Flutter version**
+```bash
+# Install and use the correct version
+fvm install 3.35.7
+fvm use 3.35.7
+```
+
+**FVM commands not working**
+```bash
+# Make sure you're in the project directory
+cd ouro_pay_consumer_app
+
+# Check if .fvmrc exists
+ls -la .fvmrc
+
+# Verify FVM is configured
+fvm flutter --version
+```
+
+### Build Issues
+
+**Gradle version conflicts**
+```bash
+# Clean and rebuild
+fvm flutter clean
+fvm flutter pub get
+```
+
+**iOS build issues**
+```bash
+# Clean iOS build cache
+cd ios
+rm -rf Pods/
+rm Podfile.lock
+cd ..
+fvm flutter clean
+fvm flutter pub get
+cd ios && pod install
+```
 
 ## 🤝 Contributing
 
