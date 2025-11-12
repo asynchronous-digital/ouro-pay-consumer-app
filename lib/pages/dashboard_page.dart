@@ -356,7 +356,7 @@ class _DashboardPageState extends State<DashboardPage>
               child: _buildActionButton(
                 icon: Icons.add_shopping_cart,
                 label: 'Buy Gold',
-                onPressed: () => _showComingSoon(),
+                onPressed: () => Navigator.pushNamed(context, '/trade'),
                 backgroundColor: AppColors.successGreen,
               ),
             ),
@@ -365,7 +365,7 @@ class _DashboardPageState extends State<DashboardPage>
               child: _buildActionButton(
                 icon: Icons.sell,
                 label: 'Sell Gold',
-                onPressed: () => _showComingSoon(),
+                onPressed: () => Navigator.pushNamed(context, '/trade'),
                 backgroundColor: AppColors.errorRed,
               ),
             ),
@@ -456,7 +456,7 @@ class _DashboardPageState extends State<DashboardPage>
         _buildActionButton(
           icon: Icons.swap_horiz,
           label: 'Start Trading',
-          onPressed: () => _showComingSoon(),
+          onPressed: () => Navigator.pushNamed(context, '/trade'),
           isFullWidth: true,
         ),
 
@@ -465,7 +465,7 @@ class _DashboardPageState extends State<DashboardPage>
         _buildActionButton(
           icon: Icons.history,
           label: 'Transaction History',
-          onPressed: () => _showComingSoon(),
+          onPressed: () => Navigator.pushNamed(context, '/transactions'),
           isFullWidth: true,
           backgroundColor: AppColors.cardBackground,
           textColor: AppColors.primaryGold,
@@ -599,13 +599,19 @@ class _DashboardPageState extends State<DashboardPage>
               leading: const Icon(Icons.person, color: AppColors.primaryGold),
               title: const Text('Profile',
                   style: TextStyle(color: AppColors.whiteText)),
-              onTap: () => _showComingSoon(),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushNamed(context, '/profile');
+              },
             ),
             ListTile(
               leading: const Icon(Icons.settings, color: AppColors.primaryGold),
               title: const Text('Settings',
                   style: TextStyle(color: AppColors.whiteText)),
-              onTap: () => _showComingSoon(),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.pushNamed(context, '/settings');
+              },
             ),
             ListTile(
               leading: const Icon(Icons.help, color: AppColors.primaryGold),
