@@ -166,7 +166,7 @@ class _WelcomePageState extends State<WelcomePage>
                         SizedBox(
                           width: double.infinity,
                           child: ElevatedButton(
-                            onPressed: () => _navigateToLogin(context),
+                            onPressed: () => _navigateToSignup(context),
                             style: ElevatedButton.styleFrom(
                               padding: const EdgeInsets.symmetric(vertical: 16),
                             ),
@@ -183,16 +183,28 @@ class _WelcomePageState extends State<WelcomePage>
                         SizedBox(
                           width: double.infinity,
                           child: OutlinedButton(
-                            onPressed: () => _showLearnMore(context),
+                            onPressed: () => _navigateToLogin(context),
                             style: OutlinedButton.styleFrom(
                               padding: const EdgeInsets.symmetric(vertical: 16),
                             ),
                             child: const Text(
-                              'Learn More',
+                              'Already have an account? Sign In',
                               style: TextStyle(
-                                fontSize: 18,
+                                fontSize: 16,
                                 fontWeight: FontWeight.w600,
                               ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        TextButton(
+                          onPressed: () => _showLearnMore(context),
+                          child: const Text(
+                            'Learn More',
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: AppColors.primaryGold,
+                              decoration: TextDecoration.underline,
                             ),
                           ),
                         ),
@@ -259,6 +271,10 @@ class _WelcomePageState extends State<WelcomePage>
 
   void _navigateToLogin(BuildContext context) {
     Navigator.pushNamed(context, '/login');
+  }
+
+  void _navigateToSignup(BuildContext context) {
+    Navigator.pushNamed(context, '/signup');
   }
 
   void _showLearnMore(BuildContext context) {

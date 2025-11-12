@@ -3,6 +3,7 @@ import 'package:ouro_pay_consumer_app/config/app_config.dart';
 import 'package:ouro_pay_consumer_app/theme/app_theme.dart';
 import 'package:ouro_pay_consumer_app/pages/welcome_page.dart';
 import 'package:ouro_pay_consumer_app/pages/login_page.dart';
+import 'package:ouro_pay_consumer_app/pages/signup_page.dart';
 import 'package:ouro_pay_consumer_app/pages/dashboard_page.dart';
 import 'package:ouro_pay_consumer_app/pages/portfolio_page.dart';
 import 'package:ouro_pay_consumer_app/pages/trade_page.dart';
@@ -23,6 +24,7 @@ class OuroPayApp extends StatelessWidget {
       routes: {
         '/welcome': (context) => const WelcomePage(),
         '/login': (context) => const LoginPage(),
+        '/signup': (context) => const SignUpPage(),
         '/dashboard': (context) => const DashboardPage(),
         '/portfolio': (context) => const PortfolioPage(),
         '/trade': (context) => const TradePage(),

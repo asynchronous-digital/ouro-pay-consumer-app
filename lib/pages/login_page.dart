@@ -429,8 +429,7 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
   }
 
   void _navigateToSignUp() {
-    // Navigate to sign up page
-    _showComingSoon();
+    Navigator.of(context).pushNamed('/signup');
   }
 
   void _showForgotPassword() {
