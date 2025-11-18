@@ -144,40 +144,45 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
   }
 
   Widget _buildProgressIndicator() {
-    return Container(
-      padding: const EdgeInsets.all(20),
-      child: Column(
-        children: [
-          Row(
-            children: List.generate(_totalSteps, (index) {
-              bool isActive = index <= _currentStep;
-              bool isCurrent = index == _currentStep;
+    return Center(
+      child: IntrinsicWidth(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center, // Add this
+                    children: List.generate(_totalSteps, (index) {
+                      bool isActive = index <= _currentStep;
+                      bool isCurrent = index == _currentStep;
 
-              return Expanded(
-                child: Row(
-                  children: [
-                    Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: isActive
-                            ? AppColors.primaryGold
-                            : AppColors.greyText.withOpacity(0.3),
-                        border: isCurrent
-                            ? Border.all(color: AppColors.primaryGold, width: 2)
-                            : null,
-                      ),
-                      child: Center(
-                        child: isActive
-                            ? Icon(
+                      return Row(
+                        children: [
+                          Container(
+                            width: 32,
+                            height: 32,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: isActive
+                                  ? AppColors.primaryGold
+                                  : AppColors.greyText.withOpacity(0.3),
+                              border: isCurrent
+                                  ? Border.all(color: AppColors.primaryGold, width: 2)
+                                  : null,
+                            ),
+                            child: Center(
+                              child: isActive
+                                  ? Icon(
                                 index < _currentStep
                                     ? Icons.check
                                     : Icons.circle,
                                 color: AppColors.darkBackground,
                                 size: 16,
                               )
-                            : Text(
+                                  : Text(
                                 '${index + 1}',
                                 style: const TextStyle(
                                   color: AppColors.greyText,
@@ -185,32 +190,34 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
                                   fontSize: 14,
                                 ),
                               ),
-                      ),
+                            ),
+                          ),
+                          if (index < _totalSteps - 1)
+                            Container(
+                              width: 40, // Fixed width for connectors
+                              height: 2,
+                              color: index < _currentStep
+                                  ? AppColors.primaryGold
+                                  : AppColors.greyText.withOpacity(0.3),
+                            ),
+                        ],
+                      );
+                    }),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    _getStepTitle(_currentStep),
+                    style: const TextStyle(
+                      color: AppColors.whiteText,
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
                     ),
-                    if (index < _totalSteps - 1)
-                      Expanded(
-                        child: Container(
-                          height: 2,
-                          color: index < _currentStep
-                              ? AppColors.primaryGold
-                              : AppColors.greyText.withOpacity(0.3),
-                        ),
-                      ),
-                  ],
-                ),
-              );
-            }),
-          ),
-          const SizedBox(height: 12),
-          Text(
-            _getStepTitle(_currentStep),
-            style: const TextStyle(
-              color: AppColors.whiteText,
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
