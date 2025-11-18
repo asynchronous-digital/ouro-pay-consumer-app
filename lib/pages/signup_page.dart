@@ -170,26 +170,27 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
                                   ? AppColors.primaryGold
                                   : AppColors.greyText.withOpacity(0.3),
                               border: isCurrent
-                                  ? Border.all(color: AppColors.primaryGold, width: 2)
+                                  ? Border.all(
+                                      color: AppColors.primaryGold, width: 2)
                                   : null,
                             ),
                             child: Center(
                               child: isActive
                                   ? Icon(
-                                index < _currentStep
-                                    ? Icons.check
-                                    : Icons.circle,
-                                color: AppColors.darkBackground,
-                                size: 16,
-                              )
+                                      index < _currentStep
+                                          ? Icons.check
+                                          : Icons.circle,
+                                      color: AppColors.darkBackground,
+                                      size: 16,
+                                    )
                                   : Text(
-                                '${index + 1}',
-                                style: const TextStyle(
-                                  color: AppColors.greyText,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 14,
-                                ),
-                              ),
+                                      '${index + 1}',
+                                      style: const TextStyle(
+                                        color: AppColors.greyText,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14,
+                                      ),
+                                    ),
                             ),
                           ),
                           if (index < _totalSteps - 1)
