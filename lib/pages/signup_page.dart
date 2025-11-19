@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import 'package:ouro_pay_consumer_app/widgets/logo.dart';
+import 'package:ouro_pay_consumer_app/services/auth_service.dart';
 
 class SignUpPage extends StatefulWidget {
   const SignUpPage({super.key});
@@ -27,12 +28,25 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
   final _confirmPasswordController = TextEditingController();
   final _dobController = TextEditingController();
 
+  // Field-specific error messages from API
+  String? _firstNameError;
+  String? _lastNameError;
+  String? _emailError;
+  String? _phoneError;
+  String? _passwordError;
+  String? _dobError;
+
   // KYC state
   String _selectedCountry = 'United States';
   String _selectedDocumentType = 'Passport';
   bool _documentsUploaded = false;
   bool _selfieCompleted = false;
   bool _termsAccepted = false;
+  bool _isStepOneSubmitting = false;
+
+  // Password visibility toggles
+  bool _isPasswordVisible = false;
+  bool _isConfirmPasswordVisible = false;
 
   @override
   void initState() {
@@ -243,6 +257,7 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
       padding: const EdgeInsets.all(24),
       child: Form(
         key: _personalFormKey,
+        autovalidateMode: AutovalidateMode.always,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -272,7 +287,18 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
               controller: _firstNameController,
               label: 'First Name',
               icon: Icons.person_outline,
+              errorText: _firstNameError,
+              onChanged: () {
+                if (_firstNameError != null) {
+                  setState(() {
+                    _firstNameError = null;
+                  });
+                }
+              },
               validator: (value) {
+                if (_firstNameError != null) {
+                  return _firstNameError;
+                }
                 if (value == null || value.isEmpty) {
                   return 'Please enter your first name';
                 }
@@ -286,7 +312,18 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
               controller: _lastNameController,
               label: 'Last Name',
               icon: Icons.person_outline,
+              errorText: _lastNameError,
+              onChanged: () {
+                if (_lastNameError != null) {
+                  setState(() {
+                    _lastNameError = null;
+                  });
+                }
+              },
               validator: (value) {
+                if (_lastNameError != null) {
+                  return _lastNameError;
+                }
                 if (value == null || value.isEmpty) {
                   return 'Please enter your last name';
                 }
@@ -301,7 +338,18 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
               label: 'Email Address',
               icon: Icons.email_outlined,
               keyboardType: TextInputType.emailAddress,
+              errorText: _emailError,
+              onChanged: () {
+                if (_emailError != null) {
+                  setState(() {
+                    _emailError = null;
+                  });
+                }
+              },
               validator: (value) {
+                if (_emailError != null) {
+                  return _emailError;
+                }
                 if (value == null || value.isEmpty) {
                   return 'Please enter your email';
                 }
@@ -319,7 +367,18 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
               label: 'Phone Number',
               icon: Icons.phone_outlined,
               keyboardType: TextInputType.phone,
+              errorText: _phoneError,
+              onChanged: () {
+                if (_phoneError != null) {
+                  setState(() {
+                    _phoneError = null;
+                  });
+                }
+              },
               validator: (value) {
+                if (_phoneError != null) {
+                  return _phoneError;
+                }
                 if (value == null || value.isEmpty) {
                   return 'Please enter your phone number';
                 }
@@ -334,8 +393,19 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
               label: 'Date of Birth',
               icon: Icons.calendar_today_outlined,
               readOnly: true,
-              onTap: () => _selectDateOfBirth(),
+              errorText: _dobError,
+              onTap: () {
+                if (_dobError != null) {
+                  setState(() {
+                    _dobError = null;
+                  });
+                }
+                _selectDateOfBirth();
+              },
               validator: (value) {
+                if (_dobError != null) {
+                  return _dobError;
+                }
                 if (value == null || value.isEmpty) {
                   return 'Please select your date of birth';
                 }
@@ -349,8 +419,38 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
               controller: _passwordController,
               label: 'Password',
               icon: Icons.lock_outline,
-              obscureText: true,
+              obscureText: !_isPasswordVisible,
+              errorText: _passwordError,
+              suffixIcon: IconButton(
+                icon: Icon(
+                  _isPasswordVisible ? Icons.visibility : Icons.visibility_off,
+                  color: AppColors.greyText,
+                ),
+                onPressed: () {
+                  setState(() {
+                    _isPasswordVisible = !_isPasswordVisible;
+                  });
+                },
+              ),
+              onChanged: () {
+                if (_passwordError != null) {
+                  setState(() {
+                    _passwordError = null;
+                  });
+                }
+                // Re-validate confirm password field when password changes
+                if (_confirmPasswordController.text.isNotEmpty) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (mounted) {
+                      _personalFormKey.currentState?.validate();
+                    }
+                  });
+                }
+              },
               validator: (value) {
+                if (_passwordError != null) {
+                  return _passwordError;
+                }
                 if (value == null || value.isEmpty) {
                   return 'Please enter a password';
                 }
@@ -367,15 +467,55 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
               controller: _confirmPasswordController,
               label: 'Confirm Password',
               icon: Icons.lock_outline,
-              obscureText: true,
+              obscureText: !_isConfirmPasswordVisible,
+              suffixIcon: IconButton(
+                icon: Icon(
+                  _isConfirmPasswordVisible
+                      ? Icons.visibility
+                      : Icons.visibility_off,
+                  color: AppColors.greyText,
+                ),
+                onPressed: () {
+                  setState(() {
+                    _isConfirmPasswordVisible = !_isConfirmPasswordVisible;
+                  });
+                },
+              ),
+              onChanged: () {
+                // Re-validate when confirm password changes
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (mounted) {
+                    _personalFormKey.currentState?.validate();
+                  }
+                });
+              },
               validator: (value) {
                 if (value == null || value.isEmpty) {
                   return 'Please confirm your password';
                 }
-                if (value != _passwordController.text) {
-                  return 'Passwords do not match';
+                // Get the current password value directly from controller
+                final password = _passwordController.text;
+                final confirmPassword = value;
+
+                // Debug: Print both values to help identify issues
+                print('🔍 Password comparison:');
+                print('  Password: "${password}" (length: ${password.length})');
+                print(
+                    '  Confirm: "${confirmPassword}" (length: ${confirmPassword.length})');
+                print('  Match: ${password == confirmPassword}');
+
+                // Direct comparison first
+                if (confirmPassword == password) {
+                  return null;
                 }
-                return null;
+
+                // If direct comparison fails, try trimming
+                if (confirmPassword.trim() == password.trim()) {
+                  return null;
+                }
+
+                // If still no match, return error
+                return 'Passwords do not match';
               },
             ),
             const SizedBox(height: 32),
@@ -384,11 +524,13 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: () {
-                  if (_personalFormKey.currentState!.validate()) {
-                    _nextStep();
-                  }
-                },
+                onPressed: _isStepOneSubmitting
+                    ? null
+                    : () {
+                        if (_personalFormKey.currentState!.validate()) {
+                          _handleStepOneContinue();
+                        }
+                      },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primaryGold,
                   foregroundColor: AppColors.darkBackground,
@@ -397,19 +539,175 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                child: const Text(
-                  'Continue',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+                child: _isStepOneSubmitting
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          color: AppColors.darkBackground,
+                          strokeWidth: 2,
+                        ),
+                      )
+                    : const Text(
+                        'Continue',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
               ),
             ),
           ],
         ),
       ),
     );
+  }
+
+  Future<void> _handleStepOneContinue() async {
+    if (_isStepOneSubmitting) return;
+
+    setState(() {
+      _isStepOneSubmitting = true;
+    });
+
+    try {
+      final authService = AuthService();
+      final dateOfBirthISO = _formatDateOfBirth(_dobController.text);
+
+      final response = await authService.register(
+        firstName: _firstNameController.text.trim(),
+        lastName: _lastNameController.text.trim(),
+        email: _emailController.text.trim(),
+        phone: _phoneController.text.trim(),
+        dateOfBirth: dateOfBirthISO,
+        password: _passwordController.text,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _isStepOneSubmitting = false;
+      });
+
+      if (response.success) {
+        if (response.token != null) {
+          await authService.saveToken(response.token!);
+        }
+        if (response.user != null) {
+          await authService.saveUserData(response.user!);
+        } else if (response.data != null &&
+            response.data!['user'] != null &&
+            response.data!['user'] is Map<String, dynamic>) {
+          await authService
+              .saveUserData(response.data!['user'] as Map<String, dynamic>);
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(response.message ??
+                'Account created. Continue with verification steps.'),
+            backgroundColor: AppColors.primaryGold,
+          ),
+        );
+
+        _nextStep();
+      } else {
+        // Handle field-specific validation errors
+        print(
+            '🔴 Registration failed. Response fieldErrors: ${response.fieldErrors}');
+        if (response.fieldErrors != null && response.fieldErrors!.isNotEmpty) {
+          // Map API field errors to our field error variables
+          // Handle various possible field name formats
+          Map<String, String> fieldErrorMap = {};
+          response.fieldErrors!.forEach((field, error) {
+            print('  📍 Mapping field error: "$field" -> "$error"');
+            switch (field.toLowerCase()) {
+              case 'firstname':
+              case 'first_name':
+                fieldErrorMap['firstName'] = error;
+                break;
+              case 'lastname':
+              case 'last_name':
+                fieldErrorMap['lastName'] = error;
+                break;
+              case 'email':
+                fieldErrorMap['email'] = error;
+                break;
+              case 'phone':
+              case 'phonenumber':
+              case 'phone_number':
+                fieldErrorMap['phone'] = error;
+                break;
+              case 'password':
+                fieldErrorMap['password'] = error;
+                break;
+              case 'dateofbirth':
+              case 'date_of_birth':
+              case 'dob':
+                fieldErrorMap['dob'] = error;
+                break;
+            }
+          });
+
+          print('✅ Mapped field errors: $fieldErrorMap');
+
+          // Set all error state variables in one setState call
+          setState(() {
+            _firstNameError = fieldErrorMap['firstName'];
+            _lastNameError = fieldErrorMap['lastName'];
+            _emailError = fieldErrorMap['email'];
+            _phoneError = fieldErrorMap['phone'];
+            _passwordError = fieldErrorMap['password'];
+            _dobError = fieldErrorMap['dob'];
+          });
+
+          print(
+              '✅ Set state errors - firstName: $_firstNameError, email: $_emailError, phone: $_phoneError');
+
+          // Trigger form validation to show the errors
+          // Use a small delay to ensure state is updated before validation
+          Future.delayed(const Duration(milliseconds: 300), () {
+            if (mounted) {
+              // Force validation on all fields to display the errors
+              _personalFormKey.currentState?.validate();
+            }
+          });
+
+          // Show snackbar message along with field-specific errors
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(response.message ??
+                  'Validation failed. Please check the fields below.'),
+              backgroundColor: AppColors.errorRed,
+              duration: const Duration(seconds: 4),
+            ),
+          );
+        } else {
+          // Show generic error message if no field-specific errors were provided
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(response.message ??
+                  'Registration failed. Please check your information and try again.'),
+              backgroundColor: AppColors.errorRed,
+              duration: const Duration(seconds: 4),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _isStepOneSubmitting = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('An unexpected error occurred: ${e.toString()}'),
+          backgroundColor: AppColors.errorRed,
+        ),
+      );
+    }
   }
 
   Widget _buildDocumentVerificationStep() {
@@ -895,6 +1193,9 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
     bool readOnly = false,
     VoidCallback? onTap,
     String? Function(String?)? validator,
+    String? errorText,
+    VoidCallback? onChanged,
+    Widget? suffixIcon,
   }) {
     return TextFormField(
       controller: controller,
@@ -902,14 +1203,17 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
       obscureText: obscureText,
       readOnly: readOnly,
       onTap: onTap,
+      onChanged: onChanged != null ? (_) => onChanged() : null,
       validator: validator,
       style: const TextStyle(color: AppColors.whiteText),
       decoration: InputDecoration(
         labelText: label,
         labelStyle: const TextStyle(color: AppColors.greyText),
         prefixIcon: Icon(icon, color: AppColors.primaryGold),
+        suffixIcon: suffixIcon,
         filled: true,
         fillColor: AppColors.cardBackground,
+        errorStyle: const TextStyle(color: AppColors.errorRed, fontSize: 12),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide.none,
@@ -920,7 +1224,11 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.errorRed),
+          borderSide: const BorderSide(color: AppColors.errorRed, width: 2),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: AppColors.errorRed, width: 2),
         ),
       ),
     );
@@ -1139,34 +1447,45 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
     return _documentsUploaded && _selfieCompleted && _termsAccepted;
   }
 
-  void _submitRegistration() {
-    // Show success dialog
+  Future<void> _submitRegistration() async {
     showDialog(
       context: context,
-      barrierDismissible: false,
       builder: (context) => AlertDialog(
         backgroundColor: AppColors.cardBackground,
         title: const Text(
-          'Registration Submitted!',
+          'Additional Steps Pending',
           style: TextStyle(color: AppColors.primaryGold),
         ),
         content: const Text(
-          'Your account has been created and is now under review. You\'ll receive an email confirmation once your account is activated.',
+          'KYC and verification endpoints will be implemented in upcoming steps.',
           style: TextStyle(color: AppColors.whiteText),
         ),
         actions: [
           TextButton(
-            onPressed: () {
-              Navigator.of(context).pop(); // Close dialog
-              Navigator.of(context).pop(); // Go back to previous page
-            },
+            onPressed: () => Navigator.of(context).pop(),
             child: const Text(
-              'Continue to Login',
+              'OK',
               style: TextStyle(color: AppColors.primaryGold),
             ),
           ),
         ],
       ),
     );
+  }
+
+  String _formatDateOfBirth(String value) {
+    try {
+      final parts = value.split('/');
+      if (parts.length == 3) {
+        final day = int.parse(parts[0]);
+        final month = int.parse(parts[1]);
+        final year = int.parse(parts[2]);
+        final dob = DateTime(year, month, day);
+        return dob.toIso8601String().split('T').first;
+      }
+      return value;
+    } catch (_) {
+      return value;
+    }
   }
 }

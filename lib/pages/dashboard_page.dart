@@ -3,6 +3,7 @@ import 'package:ouro_pay_consumer_app/theme/app_theme.dart';
 import 'package:ouro_pay_consumer_app/models/portfolio.dart';
 import 'package:ouro_pay_consumer_app/models/user.dart';
 import 'package:ouro_pay_consumer_app/widgets/logo.dart';
+import 'package:ouro_pay_consumer_app/services/auth_service.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -21,19 +22,46 @@ class _DashboardPageState extends State<DashboardPage>
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    _loadUserData();
+    _portfolio = UserPortfolio.createDefault('user_123'); // Will be updated when user loads
+  }
 
-    // Initialize with default user and portfolio
-    _user = User(
-      id: 'user_123',
-      email: 'user@example.com',
-      firstName: 'John',
-      lastName: 'Doe',
-      createdAt: DateTime.now(),
-      lastLoginAt: DateTime.now(),
-      isVerified: true,
-    );
-
-    _portfolio = UserPortfolio.createDefault(_user.id);
+  Future<void> _loadUserData() async {
+    try {
+      final authService = AuthService();
+      final user = await authService.getCurrentUser();
+      if (mounted) {
+        setState(() {
+          _user = user ?? User(
+            id: 'user_123',
+            email: 'user@example.com',
+            firstName: 'Guest',
+            lastName: 'User',
+            createdAt: DateTime.now(),
+            lastLoginAt: DateTime.now(),
+            isVerified: false,
+          );
+          // Update portfolio with user ID
+          _portfolio = UserPortfolio.createDefault(_user.id);
+        });
+      }
+    } catch (e) {
+      // Fallback to default user if loading fails
+      if (mounted) {
+        setState(() {
+          _user = User(
+            id: 'user_123',
+            email: 'user@example.com',
+            firstName: 'Guest',
+            lastName: 'User',
+            createdAt: DateTime.now(),
+            lastLoginAt: DateTime.now(),
+            isVerified: false,
+          );
+          _portfolio = UserPortfolio.createDefault(_user.id);
+        });
+      }
+    }
   }
 
   @override
@@ -632,9 +660,104 @@ class _DashboardPageState extends State<DashboardPage>
     );
   }
 
-  void _handleLogout() {
+  Future<void> _handleLogout() async {
     Navigator.pop(context); // Close bottom sheet
-    Navigator.pushReplacementNamed(context, '/welcome');
+    
+    // Show confirmation dialog
+    final shouldLogout = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.cardBackground,
+        title: const Text(
+          'Logout',
+          style: TextStyle(color: AppColors.whiteText),
+        ),
+        content: const Text(
+          'Are you sure you want to logout?',
+          style: TextStyle(color: AppColors.greyText),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: AppColors.greyText),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text(
+              'Logout',
+              style: TextStyle(color: AppColors.errorRed),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldLogout == true) {
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(
+          child: CircularProgressIndicator(
+            color: AppColors.primaryGold,
+          ),
+        ),
+      );
+
+      try {
+        final authService = AuthService();
+        final success = await authService.logout();
+
+        if (context.mounted) {
+          Navigator.pop(context); // Close loading dialog
+
+          if (success) {
+            // Navigate to welcome page and clear navigation stack
+            Navigator.pushNamedAndRemoveUntil(
+              context,
+              '/welcome',
+              (route) => false,
+            );
+
+            // Show success message
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Logged out successfully'),
+                backgroundColor: AppColors.primaryGold,
+              ),
+            );
+          } else {
+            // Even if logout API failed, still navigate to welcome
+            Navigator.pushNamedAndRemoveUntil(
+              context,
+              '/welcome',
+              (route) => false,
+            );
+          }
+        }
+      } catch (e) {
+        if (context.mounted) {
+          Navigator.pop(context); // Close loading dialog
+          
+          // Still navigate to welcome even if there's an error
+          Navigator.pushNamedAndRemoveUntil(
+            context,
+            '/welcome',
+            (route) => false,
+          );
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Logout completed: ${e.toString()}'),
+              backgroundColor: AppColors.errorRed,
+            ),
+          );
+        }
+      }
+    }
   }
 
   void _showComingSoon() {

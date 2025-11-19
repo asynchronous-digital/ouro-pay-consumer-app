@@ -66,14 +66,50 @@ class User {
   }
 
   factory User.fromJson(Map<String, dynamic> json) {
+    // Handle different possible field names from API
+    final id = json['id'] ?? json['_id'] ?? '';
+    final email = json['email'] ?? '';
+    final firstName = json['firstName'] ?? json['first_name'] ?? json['firstname'] ?? '';
+    final lastName = json['lastName'] ?? json['last_name'] ?? json['lastname'] ?? '';
+    
+    // Handle date parsing with fallbacks
+    DateTime createdAt;
+    try {
+      createdAt = json['createdAt'] != null 
+          ? DateTime.parse(json['createdAt'].toString())
+          : (json['created_at'] != null 
+              ? DateTime.parse(json['created_at'].toString())
+              : DateTime.now());
+    } catch (e) {
+      createdAt = DateTime.now();
+    }
+    
+    DateTime lastLoginAt;
+    try {
+      lastLoginAt = json['lastLoginAt'] != null
+          ? DateTime.parse(json['lastLoginAt'].toString())
+          : (json['last_login_at'] != null
+              ? DateTime.parse(json['last_login_at'].toString())
+              : DateTime.now());
+    } catch (e) {
+      lastLoginAt = DateTime.now();
+    }
+    
+    final isVerified = json['isVerified'] ?? json['is_verified'] ?? json['verified'] ?? false;
+    
     return User(
-      id: json['id'],
-      email: json['email'],
-      firstName: json['firstName'],
-      lastName: json['lastName'],
-      createdAt: DateTime.parse(json['createdAt']),
-      lastLoginAt: DateTime.parse(json['lastLoginAt']),
-      isVerified: json['isVerified'],
+      id: id,
+      email: email,
+      firstName: firstName,
+      lastName: lastName,
+      createdAt: createdAt,
+      lastLoginAt: lastLoginAt,
+      isVerified: isVerified,
     );
+  }
+  
+  /// Create a User from API response with flexible field mapping
+  factory User.fromApiResponse(Map<String, dynamic> json) {
+    return User.fromJson(json);
   }
 }
