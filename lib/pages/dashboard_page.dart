@@ -16,29 +16,39 @@ class _DashboardPageState extends State<DashboardPage>
     with TickerProviderStateMixin {
   late TabController _tabController;
   late UserPortfolio _portfolio;
-  late User _user;
+  User _user = User(
+    id: 'user_123',
+    email: 'user@example.com',
+    firstName: 'Guest',
+    lastName: 'User',
+    createdAt: DateTime.now(),
+    lastLoginAt: DateTime.now(),
+    isVerified: false,
+  );
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
     _portfolio = UserPortfolio.createDefault('user_123'); // Will be updated when user loads
-    _loadUserData();
+    // Load user data after a small delay to ensure it's available after login
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _loadUserData();
+      }
+    });
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Reload user data if user is still default/guest (e.g., after login)
-    // This ensures user data is refreshed when navigating from login
-    try {
-      if (_user.firstName == 'Guest' && _user.email == 'user@example.com') {
+    // Always reload user data when page becomes visible (e.g., after login)
+    // This ensures we get the latest user data
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
         _loadUserData();
       }
-    } catch (e) {
-      // If _user is not initialized yet, load it
-      _loadUserData();
-    }
+    });
   }
 
   Future<void> _loadUserData() async {
@@ -47,41 +57,30 @@ class _DashboardPageState extends State<DashboardPage>
       final user = await authService.getCurrentUser();
       
       print('📊 Dashboard: Loading user data');
-      print('  User: ${user?.displayName ?? 'null'} (${user?.email ?? 'no email'})');
+      print('  User from storage: ${user?.displayName ?? 'null'} (${user?.email ?? 'no email'})');
+      print('  Current user: ${_user.displayName} (${_user.email})');
       
       if (mounted) {
-        setState(() {
-          _user = user ?? User(
-            id: 'user_123',
-            email: 'user@example.com',
-            firstName: 'Guest',
-            lastName: 'User',
-            createdAt: DateTime.now(),
-            lastLoginAt: DateTime.now(),
-            isVerified: false,
-          );
-          // Update portfolio with user ID
-          _portfolio = UserPortfolio.createDefault(_user.id);
-        });
-        print('  ✅ Dashboard: User data loaded - ${_user.displayName}');
+        if (user != null) {
+          // Update with actual user data
+          setState(() {
+            _user = user;
+            // Update portfolio with user ID
+            _portfolio = UserPortfolio.createDefault(_user.id);
+          });
+          print('  ✅ Dashboard: User data updated - ${_user.displayName} (${_user.email})');
+        } else {
+          print('  ⚠️ Dashboard: No user data found in storage');
+          // Check if we're authenticated - if yes, try to reload
+          final isAuth = await authService.isAuthenticated();
+          if (isAuth) {
+            print('  🔄 Dashboard: User is authenticated but no data found, this might be a sync issue');
+          }
+        }
       }
     } catch (e) {
       print('  ❌ Dashboard: Error loading user data: $e');
-      // Fallback to default user if loading fails
-      if (mounted) {
-        setState(() {
-          _user = User(
-            id: 'user_123',
-            email: 'user@example.com',
-            firstName: 'Guest',
-            lastName: 'User',
-            createdAt: DateTime.now(),
-            lastLoginAt: DateTime.now(),
-            isVerified: false,
-          );
-          _portfolio = UserPortfolio.createDefault(_user.id);
-        });
-      }
+      print('  Stack trace: ${StackTrace.current}');
     }
   }
 

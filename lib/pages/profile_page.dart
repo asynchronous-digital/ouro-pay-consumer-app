@@ -17,35 +17,73 @@ class _ProfilePageState extends State<ProfilePage> {
   @override
   void initState() {
     super.initState();
-    _loadUserData();
+    // Load user data after a small delay to ensure it's available after login
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _loadUserData();
+      }
+    });
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Reload user data if not already loaded or if user is null
-    if (_user == null && !_isLoading) {
-      _loadUserData();
-    }
+    // Always reload user data when page becomes visible
+    // This ensures we get the latest user data
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && !_isLoading) {
+        _loadUserData();
+      }
+    });
   }
 
   Future<void> _loadUserData() async {
+    if (!mounted) return;
+
+    setState(() {
+      _isLoading = true;
+    });
+
     try {
       final authService = AuthService();
-      final user = await authService.getCurrentUser();
-      
+      var user = await authService.getCurrentUser();
+
       print('👤 Profile: Loading user data');
-      print('  User: ${user?.displayName ?? 'null'} (${user?.email ?? 'no email'})');
-      
+      print(
+          '  User: ${user?.displayName ?? 'null'} (${user?.email ?? 'no email'})');
+
+      // If no user data but we have a token, the data might not have been saved during login
+      // In this case, we should check if user data exists in storage but wasn't parsed correctly
+      if (user == null) {
+        print('  ⚠️ Profile: No user data found, checking storage directly...');
+        final userData = await authService.getUserData();
+        if (userData != null) {
+          print('  📦 Found raw user data in storage: $userData');
+          try {
+            user = User.fromJson(userData);
+            print('  ✅ Successfully parsed user from raw data');
+          } catch (e) {
+            print('  ❌ Error parsing raw user data: $e');
+          }
+        }
+      }
+
       if (mounted) {
         setState(() {
           _user = user;
           _isLoading = false;
         });
-        print('  ✅ Profile: User data loaded - ${user?.displayName ?? 'null'}');
+
+        if (user != null) {
+          print(
+              '  ✅ Profile: User data loaded - ${user.displayName} (${user.email})');
+        } else {
+          print('  ⚠️ Profile: No user data found after all attempts');
+        }
       }
     } catch (e) {
       print('  ❌ Profile: Error loading user data: $e');
+      print('  Stack trace: ${StackTrace.current}');
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -69,10 +107,11 @@ class _ProfilePageState extends State<ProfilePage> {
                 color: AppColors.primaryGold,
               ),
             )
-          : Padding(
+          : SingleChildScrollView(
               padding: const EdgeInsets.all(16),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   const Text(
                     'Your Profile',
@@ -91,9 +130,10 @@ class _ProfilePageState extends State<ProfilePage> {
                           CircleAvatar(
                             radius: 30,
                             backgroundColor: AppColors.primaryGold,
-                            child: _user != null && _user!.initials.isNotEmpty
+                            child: _user != null &&
+                                    (_user?.initials.isNotEmpty ?? false)
                                 ? Text(
-                                    _user!.initials,
+                                    _user?.initials ?? 'U',
                                     style: const TextStyle(
                                       fontWeight: FontWeight.bold,
                                       color: AppColors.darkBackground,
@@ -153,71 +193,125 @@ class _ProfilePageState extends State<ProfilePage> {
                   const SizedBox(height: 20),
                   // User details section
                   if (_user != null) ...[
-                    const Text(
-                      'Account Information',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.whiteText,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
+                    // No user data available
                     Card(
-                      child: Column(
-                        children: [
-                          ListTile(
-                            leading: const Icon(
-                              Icons.email,
-                              color: AppColors.primaryGold,
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          children: [
+                            const Icon(
+                              Icons.info_outline,
+                              color: AppColors.greyText,
+                              size: 48,
                             ),
-                            title: const Text('Email'),
-                            subtitle: Text(_user!.email),
-                          ),
-                          const Divider(height: 1),
-                          ListTile(
-                            leading: const Icon(
-                              Icons.person,
-                              color: AppColors.primaryGold,
-                            ),
-                            title: const Text('Name'),
-                            subtitle: Text(_user!.displayName),
-                          ),
-                          if (_user!.firstName.isNotEmpty &&
-                              _user!.lastName.isNotEmpty) ...[
-                            const Divider(height: 1),
-                            ListTile(
-                              leading: const Icon(
-                                Icons.badge,
-                                color: AppColors.primaryGold,
+                            const SizedBox(height: 12),
+                            const Text(
+                              'User data not available',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.whiteText,
                               ),
-                              title: const Text('First Name'),
-                              subtitle: Text(_user!.firstName),
                             ),
-                            const Divider(height: 1),
-                            ListTile(
-                              leading: const Icon(
-                                Icons.badge_outlined,
-                                color: AppColors.primaryGold,
+                            const SizedBox(height: 8),
+                            const Text(
+                              'Please log in again to load your profile information.',
+                              style: TextStyle(
+                                color: AppColors.greyText,
                               ),
-                              title: const Text('Last Name'),
-                              subtitle: Text(_user!.lastName),
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 16),
+                            ElevatedButton(
+                              onPressed: _loadUserData,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.primaryGold,
+                                foregroundColor: AppColors.darkBackground,
+                              ),
+                              child: const Text('Retry Loading'),
                             ),
                           ],
-                          const Divider(height: 1),
-                          ListTile(
-                            leading: const Icon(
-                              Icons.calendar_today,
-                              color: AppColors.primaryGold,
-                            ),
-                            title: const Text('Member Since'),
-                            subtitle: Text(
-                              '${_user!.createdAt.day}/${_user!.createdAt.month}/${_user!.createdAt.year}',
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 20),
+                  ],
+                  if (_user != null) ...[
+                    Builder(
+                      builder: (context) {
+                        final user =
+                            _user!; // Safe to use ! here since we checked above
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Account Information',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.whiteText,
+                              ),
+                            ),
+                            const SizedBox(height: 12),
+                            Card(
+                              child: Column(
+                                children: [
+                                  ListTile(
+                                    leading: const Icon(
+                                      Icons.email,
+                                      color: AppColors.primaryGold,
+                                    ),
+                                    title: const Text('Email'),
+                                    subtitle: Text(user.email),
+                                  ),
+                                  const Divider(height: 1),
+                                  ListTile(
+                                    leading: const Icon(
+                                      Icons.person,
+                                      color: AppColors.primaryGold,
+                                    ),
+                                    title: const Text('Name'),
+                                    subtitle: Text(user.displayName),
+                                  ),
+                                  if (user.firstName.isNotEmpty &&
+                                      user.lastName.isNotEmpty) ...[
+                                    const Divider(height: 1),
+                                    ListTile(
+                                      leading: const Icon(
+                                        Icons.badge,
+                                        color: AppColors.primaryGold,
+                                      ),
+                                      title: const Text('First Name'),
+                                      subtitle: Text(user.firstName),
+                                    ),
+                                    const Divider(height: 1),
+                                    ListTile(
+                                      leading: const Icon(
+                                        Icons.badge_outlined,
+                                        color: AppColors.primaryGold,
+                                      ),
+                                      title: const Text('Last Name'),
+                                      subtitle: Text(user.lastName),
+                                    ),
+                                  ],
+                                  const Divider(height: 1),
+                                  ListTile(
+                                    leading: const Icon(
+                                      Icons.calendar_today,
+                                      color: AppColors.primaryGold,
+                                    ),
+                                    title: const Text('Member Since'),
+                                    subtitle: Text(
+                                      '${user.createdAt.day}/${user.createdAt.month}/${user.createdAt.year}',
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 20),
+                          ],
+                        );
+                      },
+                    ),
                   ],
                   const SizedBox(height: 20),
                   const Divider(color: AppColors.greyText),

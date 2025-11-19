@@ -50,7 +50,10 @@ class User {
     if (firstName.isNotEmpty && lastName.isNotEmpty) {
       return '${firstName[0]}${lastName[0]}'.toUpperCase();
     }
-    return email[0].toUpperCase();
+    if (email.isNotEmpty) {
+      return email[0].toUpperCase();
+    }
+    return 'U'; // Default to 'U' for User if no email
   }
 
   Map<String, dynamic> toJson() {
@@ -67,35 +70,49 @@ class User {
 
   factory User.fromJson(Map<String, dynamic> json) {
     // Handle different possible field names from API
-    final id = json['id'] ?? json['_id'] ?? '';
-    final email = json['email'] ?? '';
-    final firstName = json['firstName'] ?? json['first_name'] ?? json['firstname'] ?? '';
-    final lastName = json['lastName'] ?? json['last_name'] ?? json['lastname'] ?? '';
+    // Convert all values to strings to handle int/string type mismatches
+    final idValue = json['id'] ?? json['_id'];
+    final id = idValue != null ? idValue.toString() : '';
+    
+    final emailValue = json['email'];
+    final email = emailValue != null ? emailValue.toString() : '';
+    
+    final firstNameValue = json['firstName'] ?? json['first_name'] ?? json['firstname'];
+    final firstName = firstNameValue != null ? firstNameValue.toString() : '';
+    
+    final lastNameValue = json['lastName'] ?? json['last_name'] ?? json['lastname'];
+    final lastName = lastNameValue != null ? lastNameValue.toString() : '';
     
     // Handle date parsing with fallbacks
     DateTime createdAt;
     try {
-      createdAt = json['createdAt'] != null 
-          ? DateTime.parse(json['createdAt'].toString())
-          : (json['created_at'] != null 
-              ? DateTime.parse(json['created_at'].toString())
-              : DateTime.now());
+      final createdAtValue = json['createdAt'] ?? json['created_at'];
+      if (createdAtValue != null) {
+        createdAt = DateTime.parse(createdAtValue.toString());
+      } else {
+        createdAt = DateTime.now();
+      }
     } catch (e) {
       createdAt = DateTime.now();
     }
     
     DateTime lastLoginAt;
     try {
-      lastLoginAt = json['lastLoginAt'] != null
-          ? DateTime.parse(json['lastLoginAt'].toString())
-          : (json['last_login_at'] != null
-              ? DateTime.parse(json['last_login_at'].toString())
-              : DateTime.now());
+      final lastLoginAtValue = json['lastLoginAt'] ?? json['last_login_at'];
+      if (lastLoginAtValue != null) {
+        lastLoginAt = DateTime.parse(lastLoginAtValue.toString());
+      } else {
+        lastLoginAt = DateTime.now();
+      }
     } catch (e) {
       lastLoginAt = DateTime.now();
     }
     
-    final isVerified = json['isVerified'] ?? json['is_verified'] ?? json['verified'] ?? false;
+    // Handle boolean with type safety
+    final isVerifiedValue = json['isVerified'] ?? json['is_verified'] ?? json['verified'];
+    final isVerified = isVerifiedValue is bool 
+        ? isVerifiedValue 
+        : (isVerifiedValue?.toString().toLowerCase() == 'true' ? true : false);
     
     return User(
       id: id,

@@ -353,7 +353,10 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
                 if (value == null || value.isEmpty) {
                   return 'Please enter your email';
                 }
-                if (!value.contains('@')) {
+                // Allow plus addresses (e.g., user+tag@example.com)
+                // Updated regex to include + in the local part
+                if (!RegExp(r'^[\w\-\.\+]+@([\w-]+\.)+[\w-]{2,4}$')
+                    .hasMatch(value)) {
                   return 'Please enter a valid email';
                 }
                 return null;
@@ -527,7 +530,8 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
                 onPressed: _isStepOneSubmitting
                     ? null
                     : () {
-                        if (_personalFormKey.currentState!.validate()) {
+                        if (_personalFormKey.currentState?.validate() ??
+                            false) {
                           _handleStepOneContinue();
                         }
                       },
@@ -595,11 +599,12 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
         }
         if (response.user != null) {
           await authService.saveUserData(response.user!);
-        } else if (response.data != null &&
-            response.data!['user'] != null &&
-            response.data!['user'] is Map<String, dynamic>) {
-          await authService
-              .saveUserData(response.data!['user'] as Map<String, dynamic>);
+        } else if (response.data != null) {
+          final data = response.data!;
+          if (data['user'] != null && data['user'] is Map<String, dynamic>) {
+            await authService
+                .saveUserData(data['user'] as Map<String, dynamic>);
+          }
         }
 
         ScaffoldMessenger.of(context).showSnackBar(
@@ -768,9 +773,11 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
                   DropdownMenuItem(value: 'Suriname', child: Text('Suriname')),
                 ],
                 onChanged: (value) {
-                  setState(() {
-                    _selectedCountry = value!;
-                  });
+                  if (value != null) {
+                    setState(() {
+                      _selectedCountry = value;
+                    });
+                  }
                 },
               ),
             ),
@@ -1368,7 +1375,7 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
               surface: AppColors.cardBackground,
             ),
           ),
-          child: child!,
+          child: child ?? const SizedBox(),
         );
       },
     );

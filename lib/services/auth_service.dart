@@ -56,7 +56,8 @@ class RegisterResponse {
     if (json['errors'] != null) {
       if (json['errors'] is Map) {
         fieldErrors = {};
-        (json['errors'] as Map).forEach((key, value) {
+        final errorsMap = json['errors'] as Map;
+        errorsMap.forEach((key, value) {
           if (value is String) {
             fieldErrors![key.toString()] = value;
           } else if (value is List && value.isNotEmpty) {
@@ -66,7 +67,8 @@ class RegisterResponse {
       }
     } else if (json['validation'] != null && json['validation'] is Map) {
       fieldErrors = {};
-      (json['validation'] as Map).forEach((key, value) {
+      final validationMap = json['validation'] as Map;
+      validationMap.forEach((key, value) {
         if (value is String) {
           fieldErrors![key.toString()] = value;
         } else if (value is List && value.isNotEmpty) {
@@ -260,10 +262,18 @@ class AuthService {
         );
       }
 
+      // Print API response for debugging
+      print('🔵 LOGIN API CALL');
+      print('📍 URL: $url');
+      print('📥 Response Status Code: ${response.statusCode}');
+      print('📥 Response Body: ${response.body}');
+
       Map<String, dynamic> responseData;
       try {
         responseData = jsonDecode(response.body) as Map<String, dynamic>;
+        print('📥 Parsed Response Data: $responseData');
       } catch (e) {
+        print('❌ Error parsing response: $e');
         return LoginResponse(
           success: false,
           message: 'Invalid response format from server. Please try again.',
@@ -271,7 +281,19 @@ class AuthService {
       }
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        return LoginResponse.fromJson(responseData);
+        final loginResponse = LoginResponse.fromJson(responseData);
+        print('✅ Login Response Parsed:');
+        print('  Success: ${loginResponse.success}');
+        print('  Token: ${loginResponse.token != null ? 'Present' : 'Missing'}');
+        print('  User: ${loginResponse.user != null ? loginResponse.user : 'Missing'}');
+        print('  Data: ${loginResponse.data != null ? loginResponse.data : 'Missing'}');
+        if (loginResponse.data != null) {
+          final data = loginResponse.data!;
+          if (data['user'] != null) {
+            print('  Data.user: ${data['user']}');
+          }
+        }
+        return loginResponse;
       } else {
         // Handle error response
         return LoginResponse(
@@ -317,20 +339,36 @@ class AuthService {
   /// Save user data
   Future<void> saveUserData(Map<String, dynamic> userData) async {
     final prefs = await _prefs;
-    await prefs.setString(_userKey, jsonEncode(userData));
+    final userJson = jsonEncode(userData);
+    await prefs.setString(_userKey, userJson);
+    print('💾 AuthService: User data saved');
+    print('  User: ${userData['firstName'] ?? 'N/A'} ${userData['lastName'] ?? 'N/A'} (${userData['email'] ?? 'N/A'})');
+    print('  Data: $userJson');
   }
 
   /// Get user data as Map
   Future<Map<String, dynamic>?> getUserData() async {
     final prefs = await _prefs;
     final userDataString = prefs.getString(_userKey);
+    print('🔍 AuthService: Getting user data from storage');
+    print('  Storage key: $_userKey');
+    print('  Data found: ${userDataString != null ? 'Yes' : 'No'}');
     if (userDataString != null) {
+      print('  Raw data string: $userDataString');
       try {
-        return jsonDecode(userDataString) as Map<String, dynamic>;
+        final decoded = jsonDecode(userDataString) as Map<String, dynamic>;
+        print('  ✅ Successfully decoded user data');
+        print('  Decoded data: $decoded');
+        return decoded;
       } catch (e) {
+        print('  ❌ Error decoding user data: $e');
         return null;
       }
     }
+    print('  ⚠️ No user data string found in storage');
+    // Check if token exists (user might be logged in but data not saved)
+    final token = await getToken();
+    print('  Token exists: ${token != null ? 'Yes' : 'No'}');
     return null;
   }
 
@@ -339,10 +377,27 @@ class AuthService {
     final userData = await getUserData();
     if (userData != null) {
       try {
-        return User.fromJson(userData);
+        final user = User.fromJson(userData);
+        print('👤 AuthService: Retrieved user data from storage');
+        print('  User: ${user.displayName} (${user.email})');
+        return user;
       } catch (e) {
+        print('❌ AuthService: Error parsing user data: $e');
+        print('  Raw data: $userData');
         return null;
       }
+    }
+    
+    // If no user data in storage, check if we have a token
+    // This might mean user is logged in but data wasn't saved
+    final token = await getToken();
+    if (token != null) {
+      print('⚠️ AuthService: No user data in storage but token exists');
+      print('  This suggests user is logged in but user data was not saved during login');
+      print('  Please check login logs to see if user data was in the API response');
+    } else {
+      print('⚠️ AuthService: No user data found in storage and no token');
+      print('  User is not logged in');
     }
     return null;
   }

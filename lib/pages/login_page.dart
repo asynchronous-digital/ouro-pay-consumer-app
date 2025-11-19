@@ -383,7 +383,9 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
     if (value == null || value.isEmpty) {
       return 'Please enter your email';
     }
-    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+    // Allow plus addresses (e.g., user+tag@example.com)
+    // Updated regex to include + in the local part
+    if (!RegExp(r'^[\w\-\.\+]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
       return 'Please enter a valid email';
     }
     return null;
@@ -418,18 +420,64 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
           });
 
           if (response.success) {
+            print('✅ Login: Success response received');
+            print('  Token: ${response.token != null ? 'Present' : 'Missing'}');
+            print(
+                '  User data: ${response.user != null ? 'Present' : 'Missing'}');
+            print(
+                '  Data object: ${response.data != null ? 'Present' : 'Missing'}');
+
             // Save token if available
             if (response.token != null) {
               await authService.saveToken(response.token!);
+              print('  💾 Token saved');
             }
 
             // Save user data if available
+            Map<String, dynamic>? userDataToSave;
             if (response.user != null) {
-              await authService.saveUserData(response.user!);
-            } else if (response.data != null &&
-                response.data!['user'] != null) {
-              await authService
-                  .saveUserData(response.data!['user'] as Map<String, dynamic>);
+              userDataToSave = response.user;
+              print('  📦 Using response.user: $userDataToSave');
+            } else if (response.data != null) {
+              final data = response.data!;
+              if (data['user'] != null &&
+                  data['user'] is Map<String, dynamic>) {
+                userDataToSave = data['user'] as Map<String, dynamic>;
+                print('  📦 Using response.data[\'user\']: $userDataToSave');
+              } else {
+                // Sometimes the entire data object IS the user data
+                print('  📦 Checking if response.data is user data: $data');
+                // Check if data has user-like fields
+                if (data.containsKey('email') ||
+                    data.containsKey('firstName') ||
+                    data.containsKey('first_name')) {
+                  userDataToSave = data;
+                  print('  📦 Using response.data as user data');
+                }
+              }
+            }
+
+            if (userDataToSave != null) {
+              print('  💾 Saving user data: $userDataToSave');
+              await authService.saveUserData(userDataToSave);
+
+              // Verify it was saved
+              final savedUser = await authService.getCurrentUser();
+              print(
+                  '  ✅ Verified saved user: ${savedUser?.displayName ?? 'null'} (${savedUser?.email ?? 'no email'})');
+              if (savedUser == null) {
+                print(
+                    '  ❌ ERROR: User data was saved but could not be retrieved!');
+              }
+            } else {
+              print('  ⚠️ No user data to save!');
+              print('  Response structure:');
+              print('    response.user: ${response.user}');
+              print('    response.data: ${response.data}');
+              if (response.data != null) {
+                print(
+                    '    response.data keys: ${response.data!.keys.toList()}');
+              }
             }
 
             // Show success message
@@ -439,6 +487,9 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
                 backgroundColor: AppColors.primaryGold,
               ),
             );
+
+            // Small delay to ensure data is saved before navigation
+            await Future.delayed(const Duration(milliseconds: 100));
 
             // Navigate to dashboard
             Navigator.pushReplacementNamed(context, '/dashboard');
