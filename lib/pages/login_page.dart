@@ -423,6 +423,15 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
               await authService.saveToken(response.token!);
             }
 
+            // Save user data if available
+            if (response.user != null) {
+              await authService.saveUserData(response.user!);
+            } else if (response.data != null &&
+                response.data!['user'] != null) {
+              await authService
+                  .saveUserData(response.data!['user'] as Map<String, dynamic>);
+            }
+
             // Show success message
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
