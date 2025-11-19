@@ -22,14 +22,33 @@ class _DashboardPageState extends State<DashboardPage>
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
-    _loadUserData();
     _portfolio = UserPortfolio.createDefault('user_123'); // Will be updated when user loads
+    _loadUserData();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Reload user data if user is still default/guest (e.g., after login)
+    // This ensures user data is refreshed when navigating from login
+    try {
+      if (_user.firstName == 'Guest' && _user.email == 'user@example.com') {
+        _loadUserData();
+      }
+    } catch (e) {
+      // If _user is not initialized yet, load it
+      _loadUserData();
+    }
   }
 
   Future<void> _loadUserData() async {
     try {
       final authService = AuthService();
       final user = await authService.getCurrentUser();
+      
+      print('📊 Dashboard: Loading user data');
+      print('  User: ${user?.displayName ?? 'null'} (${user?.email ?? 'no email'})');
+      
       if (mounted) {
         setState(() {
           _user = user ?? User(
@@ -44,8 +63,10 @@ class _DashboardPageState extends State<DashboardPage>
           // Update portfolio with user ID
           _portfolio = UserPortfolio.createDefault(_user.id);
         });
+        print('  ✅ Dashboard: User data loaded - ${_user.displayName}');
       }
     } catch (e) {
+      print('  ❌ Dashboard: Error loading user data: $e');
       // Fallback to default user if loading fails
       if (mounted) {
         setState(() {

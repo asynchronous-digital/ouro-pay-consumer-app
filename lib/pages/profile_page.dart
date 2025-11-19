@@ -20,17 +20,32 @@ class _ProfilePageState extends State<ProfilePage> {
     _loadUserData();
   }
 
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Reload user data if not already loaded or if user is null
+    if (_user == null && !_isLoading) {
+      _loadUserData();
+    }
+  }
+
   Future<void> _loadUserData() async {
     try {
       final authService = AuthService();
       final user = await authService.getCurrentUser();
+      
+      print('👤 Profile: Loading user data');
+      print('  User: ${user?.displayName ?? 'null'} (${user?.email ?? 'no email'})');
+      
       if (mounted) {
         setState(() {
           _user = user;
           _isLoading = false;
         });
+        print('  ✅ Profile: User data loaded - ${user?.displayName ?? 'null'}');
       }
     } catch (e) {
+      print('  ❌ Profile: Error loading user data: $e');
       if (mounted) {
         setState(() {
           _isLoading = false;
