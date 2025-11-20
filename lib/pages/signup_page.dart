@@ -575,11 +575,11 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
       final dateOfBirthISO = _formatDateOfBirth(_dobController.text);
 
       final response = await authService.register(
-        firstName: _firstNameController.text.trim(),
-        lastName: _lastNameController.text.trim(),
+        first_name: _firstNameController.text.trim(),
+        last_name: _lastNameController.text.trim(),
         email: _emailController.text.trim(),
         phone: _phoneController.text.trim(),
-        dateOfBirth: dateOfBirthISO,
+        date_of_birth: dateOfBirthISO,
         password: _passwordController.text,
       );
 

@@ -44,6 +44,9 @@ dependencies:
   
   # Local storage for tokens
   shared_preferences: ^2.2.2
+  
+  # Shimmer effect for loading states
+  shimmer: ^3.0.0
 
 dev_dependencies:
   flutter_test:
