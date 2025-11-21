@@ -22,6 +22,7 @@ class AppColors {
   static const Color successGreen = Color(0xFF4CAF50);
   static const Color errorRed = Color(0xFFF44336);
   static const Color warningOrange = Color(0xFFFF9800);
+  static const Color warningYellow = Color(0xFFFFC107);
   static const Color infoBlue = Color(0xFF2196F3);
 
   // Wallet Currency Colors
