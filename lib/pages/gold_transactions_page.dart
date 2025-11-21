@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:ouro_pay_consumer_app/services/gold_service.dart';
 import 'package:ouro_pay_consumer_app/theme/app_theme.dart';
@@ -47,8 +48,37 @@ class _GoldTransactionsPageState extends State<GoldTransactionsPage> {
             ? const Center(child: CircularProgressIndicator())
             : _response == null ||
                     !_response!.success ||
-                    _response!.data == null
-                ? const Center(child: Text('No transactions found'))
+                    _response!.data == null ||
+                    _response!.data!.isEmpty
+                ? Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.history_edu,
+                          size: 80,
+                          color: AppColors.primaryGold.withOpacity(0.2),
+                        ),
+                        const SizedBox(height: 16),
+                        const Text(
+                          'No Transactions Yet',
+                          style: TextStyle(
+                            color: AppColors.whiteText,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          'Your gold trading history will appear here',
+                          style: TextStyle(
+                            color: AppColors.greyText.withOpacity(0.7),
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
                 : ListView.builder(
                     padding: const EdgeInsets.all(16),
                     itemCount: _response!.data!.length,
