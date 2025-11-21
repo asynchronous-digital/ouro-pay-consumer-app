@@ -4,6 +4,10 @@ import 'package:ouro_pay_consumer_app/models/portfolio.dart';
 import 'package:ouro_pay_consumer_app/models/user.dart';
 import 'package:ouro_pay_consumer_app/widgets/logo.dart';
 import 'package:ouro_pay_consumer_app/services/auth_service.dart';
+import 'package:ouro_pay_consumer_app/services/wallet_service.dart';
+import 'package:ouro_pay_consumer_app/services/gold_service.dart';
+import 'package:ouro_pay_consumer_app/utils/debug_prefs.dart';
+import 'package:shimmer/shimmer.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -17,13 +21,21 @@ class _DashboardPageState extends State<DashboardPage>
   late TabController _tabController;
   late UserPortfolio _portfolio;
   late User _user;
+  bool _isLoadingWallets = false; // Loading state for wallets
+  bool _isLoadingGold = false; // Loading state for gold holdings
+  Map<String, double>? _goldCurrentValues; // Gold values by currency
+  double? _totalGoldGrams; // Total gold in grams
+  bool _isLoadingGoldPrice = false; // Loading state for gold price
+  GoldPriceData? _goldPriceData; // Current gold price data
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
-    _portfolio = UserPortfolio.createDefault('user_123'); // Will be updated when user loads
+    _portfolio = UserPortfolio.createDefault(
+        'user_123'); // Will be updated when user loads
     _loadUserData();
+    _loadGoldPrice(); // Load gold price for EUR by default
   }
 
   @override
@@ -43,27 +55,36 @@ class _DashboardPageState extends State<DashboardPage>
 
   Future<void> _loadUserData() async {
     try {
+      // Debug: Print all saved SharedPreferences data
+      await DebugPrefs.printAllSavedData();
+
       final authService = AuthService();
       final user = await authService.getCurrentUser();
-      
+
       print('📊 Dashboard: Loading user data');
-      print('  User: ${user?.displayName ?? 'null'} (${user?.email ?? 'no email'})');
-      
+      print(
+          '  User: ${user?.displayName ?? 'null'} (${user?.email ?? 'no email'})');
+
       if (mounted) {
         setState(() {
-          _user = user ?? User(
-            id: 'user_123',
-            email: 'user@example.com',
-            firstName: 'Guest',
-            lastName: 'User',
-            createdAt: DateTime.now(),
-            lastLoginAt: DateTime.now(),
-            isVerified: false,
-          );
+          _user = user ??
+              User(
+                id: 'user_123',
+                email: 'user@example.com',
+                firstName: 'Guest',
+                lastName: 'User',
+                createdAt: DateTime.now(),
+                lastLoginAt: DateTime.now(),
+                isVerified: false,
+              );
           // Update portfolio with user ID
           _portfolio = UserPortfolio.createDefault(_user.id);
         });
         print('  ✅ Dashboard: User data loaded - ${_user.displayName}');
+
+        // Load wallet data and gold holdings after user is loaded
+        _loadWalletData();
+        _loadGoldHoldings();
       }
     } catch (e) {
       print('  ❌ Dashboard: Error loading user data: $e');
@@ -80,6 +101,155 @@ class _DashboardPageState extends State<DashboardPage>
             isVerified: false,
           );
           _portfolio = UserPortfolio.createDefault(_user.id);
+        });
+      }
+    }
+  }
+
+  Future<void> _loadWalletData() async {
+    setState(() {
+      _isLoadingWallets = true;
+    });
+
+    try {
+      print('💰 Dashboard: Loading wallet data');
+      final walletService = WalletService();
+      final response = await walletService.getWallets();
+
+      if (mounted) {
+        if (response.success && response.wallets != null) {
+          // Convert API wallet data to app Wallet model
+          final wallets = response.wallets!.map((apiWallet) {
+            return Wallet(
+              currency: apiWallet.currencyCode,
+              amount: apiWallet.availableBalance,
+              symbol: apiWallet.currencySymbol,
+              displayName: apiWallet.currencyName,
+              hasError: false,
+            );
+          }).toList();
+
+          setState(() {
+            _portfolio = _portfolio.copyWith(
+              wallets: wallets,
+              lastUpdated: DateTime.now(),
+            );
+            _isLoadingWallets = false;
+          });
+          print('  ✅ Dashboard: ${wallets.length} wallets loaded successfully');
+        } else {
+          // On error, mark wallets as having errors (will show N/A)
+          print('  ⚠️ Dashboard: Failed to load wallets - ${response.message}');
+          final errorWallets = _portfolio.wallets.map((wallet) {
+            return wallet.copyWith(hasError: true);
+          }).toList();
+
+          setState(() {
+            _portfolio = _portfolio.copyWith(
+              wallets: errorWallets,
+              lastUpdated: DateTime.now(),
+            );
+            _isLoadingWallets = false;
+          });
+        }
+      }
+    } catch (e) {
+      print('  ❌ Dashboard: Error loading wallet data: $e');
+      // On error, mark wallets as having errors (will show N/A)
+      if (mounted) {
+        final errorWallets = _portfolio.wallets.map((wallet) {
+          return wallet.copyWith(hasError: true);
+        }).toList();
+
+        setState(() {
+          _portfolio = _portfolio.copyWith(
+            wallets: errorWallets,
+            lastUpdated: DateTime.now(),
+          );
+          _isLoadingWallets = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _loadGoldHoldings() async {
+    setState(() {
+      _isLoadingGold = true;
+    });
+
+    try {
+      print('🪙 Dashboard: Loading gold holdings');
+      final goldService = GoldService();
+      final response = await goldService.getGoldHoldings();
+
+      if (mounted) {
+        if (response.success && response.data != null) {
+          setState(() {
+            _goldCurrentValues = response.data!.currentValues;
+            _totalGoldGrams = response.data!.totalGrams;
+            _isLoadingGold = false;
+          });
+          print(
+              '  ✅ Dashboard: Gold holdings loaded - ${_totalGoldGrams} grams');
+        } else {
+          // On error, set to null (will show N/A)
+          print(
+              '  ⚠️ Dashboard: Failed to load gold holdings - ${response.message}');
+          setState(() {
+            _goldCurrentValues = null;
+            _totalGoldGrams = null;
+            _isLoadingGold = false;
+          });
+        }
+      }
+    } catch (e) {
+      print('  ❌ Dashboard: Error loading gold holdings: $e');
+      // On error, set to null (will show N/A)
+      if (mounted) {
+        setState(() {
+          _goldCurrentValues = null;
+          _totalGoldGrams = null;
+          _isLoadingGold = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _loadGoldPrice({String currency = 'EUR'}) async {
+    setState(() {
+      _isLoadingGoldPrice = true;
+    });
+
+    try {
+      print('💰 Dashboard: Loading gold price for $currency');
+      final goldService = GoldService();
+      final response = await goldService.getGoldPrice(currency);
+
+      if (mounted) {
+        if (response.success && response.data != null) {
+          setState(() {
+            _goldPriceData = response.data;
+            _isLoadingGoldPrice = false;
+          });
+          print(
+              '  ✅ Dashboard: Gold price loaded - Buy: ${_goldPriceData!.buyPrice}, Sell: ${_goldPriceData!.sellPrice}');
+        } else {
+          // On error, set to null
+          print(
+              '  ⚠️ Dashboard: Failed to load gold price - ${response.message}');
+          setState(() {
+            _goldPriceData = null;
+            _isLoadingGoldPrice = false;
+          });
+        }
+      }
+    } catch (e) {
+      print('  ❌ Dashboard: Error loading gold price: $e');
+      // On error, set to null
+      if (mounted) {
+        setState(() {
+          _goldPriceData = null;
+          _isLoadingGoldPrice = false;
         });
       }
     }
@@ -222,42 +392,95 @@ class _DashboardPageState extends State<DashboardPage>
         gradient: AppColors.goldGradient,
         borderRadius: BorderRadius.circular(20),
       ),
+      child: _isLoadingWallets
+          ? _buildShimmerPortfolio()
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Total Portfolio Value',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: AppColors.darkBackground,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    Icon(
+                      Icons.visibility,
+                      color: AppColors.darkBackground.withOpacity(0.7),
+                      size: 20,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '\$${_portfolio.totalPortfolioValue.toStringAsFixed(2)}',
+                  style: const TextStyle(
+                    fontSize: 32,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.darkBackground,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '+\$0.00 (0.00%) today',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: AppColors.darkBackground.withOpacity(0.8),
+                  ),
+                ),
+              ],
+            ),
+    );
+  }
+
+  Widget _buildShimmerPortfolio() {
+    return Shimmer.fromColors(
+      baseColor: AppColors.darkBackground.withOpacity(0.3),
+      highlightColor: AppColors.darkBackground.withOpacity(0.1),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Total Portfolio Value',
-                style: TextStyle(
-                  fontSize: 16,
+              Container(
+                width: 150,
+                height: 16,
+                decoration: BoxDecoration(
                   color: AppColors.darkBackground,
-                  fontWeight: FontWeight.w600,
+                  borderRadius: BorderRadius.circular(4),
                 ),
               ),
-              Icon(
-                Icons.visibility,
-                color: AppColors.darkBackground.withOpacity(0.7),
-                size: 20,
+              Container(
+                width: 20,
+                height: 20,
+                decoration: BoxDecoration(
+                  color: AppColors.darkBackground,
+                  borderRadius: BorderRadius.circular(4),
+                ),
               ),
             ],
           ),
           const SizedBox(height: 8),
-          Text(
-            '\$${_portfolio.totalPortfolioValue.toStringAsFixed(2)}',
-            style: const TextStyle(
-              fontSize: 32,
-              fontWeight: FontWeight.bold,
+          Container(
+            width: 200,
+            height: 32,
+            decoration: BoxDecoration(
               color: AppColors.darkBackground,
+              borderRadius: BorderRadius.circular(4),
             ),
           ),
           const SizedBox(height: 4),
-          Text(
-            '+\$0.00 (0.00%) today',
-            style: TextStyle(
-              fontSize: 14,
-              color: AppColors.darkBackground.withOpacity(0.8),
+          Container(
+            width: 120,
+            height: 14,
+            decoration: BoxDecoration(
+              color: AppColors.darkBackground,
+              borderRadius: BorderRadius.circular(4),
             ),
           ),
         ],
@@ -329,41 +552,20 @@ class _DashboardPageState extends State<DashboardPage>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Gold Holdings',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.whiteText,
-                      ),
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.primaryGold,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        '\$${_portfolio.goldHolding.currentPricePerGram.toStringAsFixed(2)}/g',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.darkBackground,
-                        ),
-                      ),
-                    ),
-                  ],
+                const Text(
+                  'Gold Holdings',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.whiteText,
+                  ),
                 ),
                 const SizedBox(height: 16),
+
+                // Total grams
                 Row(
                   children: [
-                    Icon(
+                    const Icon(
                       Icons.stars,
                       color: AppColors.primaryGold,
                       size: 32,
@@ -373,23 +575,65 @@ class _DashboardPageState extends State<DashboardPage>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          _portfolio.goldHolding.formattedGrams,
+                          _isLoadingGold
+                              ? 'Loading...'
+                              : _totalGoldGrams != null
+                                  ? '${_totalGoldGrams!.toStringAsFixed(3)} g'
+                                  : 'N/A',
                           style: const TextStyle(
                             fontSize: 24,
                             fontWeight: FontWeight.bold,
                             color: AppColors.whiteText,
                           ),
                         ),
-                        Text(
-                          _portfolio.goldHolding.formattedValue,
-                          style: const TextStyle(
-                            fontSize: 16,
+                        const Text(
+                          'Total Gold',
+                          style: TextStyle(
+                            fontSize: 14,
                             color: AppColors.greyText,
                           ),
                         ),
                       ],
                     ),
                   ],
+                ),
+
+                const SizedBox(height: 20),
+                const Divider(color: AppColors.greyText),
+                const SizedBox(height: 16),
+
+                // Currency values
+                const Text(
+                  'Value by Currency',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.whiteText,
+                  ),
+                ),
+                const SizedBox(height: 12),
+
+                // EUR
+                _buildCurrencyValueRow(
+                  'EUR',
+                  '€',
+                  AppColors.euroColor,
+                ),
+                const SizedBox(height: 12),
+
+                // USD
+                _buildCurrencyValueRow(
+                  'USD',
+                  '\$',
+                  AppColors.usdColor,
+                ),
+                const SizedBox(height: 12),
+
+                // SRD
+                _buildCurrencyValueRow(
+                  'SRD',
+                  'Sr\$',
+                  AppColors.srdColor,
                 ),
               ],
             ),
@@ -424,7 +668,74 @@ class _DashboardPageState extends State<DashboardPage>
     );
   }
 
+  Widget _buildCurrencyValueRow(String currency, String symbol, Color color) {
+    String displayValue;
+
+    if (_isLoadingGold) {
+      displayValue = 'Loading...';
+    } else if (_goldCurrentValues != null) {
+      final value = _goldCurrentValues![currency.toLowerCase()] ?? 0;
+      displayValue = '$symbol${value.toStringAsFixed(2)}';
+    } else {
+      displayValue = 'N/A';
+    }
+
+    return Row(
+      children: [
+        Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.2),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Center(
+            child: Text(
+              symbol,
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: color,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                currency,
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: AppColors.greyText,
+                ),
+              ),
+              Text(
+                displayValue,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.whiteText,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildTradeTab() {
+    final String displayCurrency = _goldPriceData?.currency ?? 'EUR';
+    final String buyPrice = _isLoadingGoldPrice
+        ? 'Loading...'
+        : _goldPriceData?.getFormattedBuyPrice() ?? 'N/A';
+    final String sellPrice = _isLoadingGoldPrice
+        ? 'Loading...'
+        : _goldPriceData?.getFormattedSellPrice() ?? 'N/A';
+
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -438,47 +749,114 @@ class _DashboardPageState extends State<DashboardPage>
         ),
         const SizedBox(height: 16),
 
-        // Market info card
+        // Market info card - Buy Price
         Card(
           child: Padding(
             padding: const EdgeInsets.all(20),
             child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
-                      'Gold Price (USD)',
-                      style: TextStyle(
+                    Text(
+                      'Buy Price ($displayCurrency)',
+                      style: const TextStyle(
                         fontSize: 16,
                         color: AppColors.greyText,
                       ),
                     ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.successGreen,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Text(
-                        '+2.3%',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
+                    if (_goldPriceData != null)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.successGreen,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          '+${_goldPriceData!.buySpreadPercentage.toStringAsFixed(0)}%',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
                         ),
                       ),
-                    ),
                   ],
                 ),
                 const SizedBox(height: 8),
                 Row(
                   children: [
                     Text(
-                      '\$${_portfolio.goldHolding.currentPricePerGram.toStringAsFixed(2)}',
+                      buyPrice,
+                      style: const TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.whiteText,
+                      ),
+                    ),
+                    const Text(
+                      ' per gram',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: AppColors.greyText,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 12),
+
+        // Sell Price Card
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'Sell Price ($displayCurrency)',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        color: AppColors.greyText,
+                      ),
+                    ),
+                    if (_goldPriceData != null)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.errorRed,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          '-${_goldPriceData!.sellSpreadPercentage.toStringAsFixed(0)}%',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Text(
+                      sellPrice,
                       style: const TextStyle(
                         fontSize: 28,
                         fontWeight: FontWeight.bold,
@@ -683,7 +1061,7 @@ class _DashboardPageState extends State<DashboardPage>
 
   Future<void> _handleLogout() async {
     Navigator.pop(context); // Close bottom sheet
-    
+
     // Show confirmation dialog
     final shouldLogout = await showDialog<bool>(
       context: context,
@@ -762,7 +1140,7 @@ class _DashboardPageState extends State<DashboardPage>
       } catch (e) {
         if (context.mounted) {
           Navigator.pop(context); // Close loading dialog
-          
+
           // Still navigate to welcome even if there's an error
           Navigator.pushNamedAndRemoveUntil(
             context,

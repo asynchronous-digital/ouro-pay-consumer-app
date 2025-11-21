@@ -52,7 +52,7 @@ class RegisterResponse {
   factory RegisterResponse.fromJson(Map<String, dynamic> json) {
     // Parse field-specific errors from various possible formats
     Map<String, String>? fieldErrors;
-    
+
     if (json['errors'] != null) {
       if (json['errors'] is Map) {
         fieldErrors = {};
@@ -74,12 +74,12 @@ class RegisterResponse {
         }
       });
     }
-    
+
     // Print parsed field errors for debugging
     if (fieldErrors != null && fieldErrors.isNotEmpty) {
       print('🔴 Parsed Field Errors: $fieldErrors');
     }
-    
+
     return RegisterResponse(
       success: json['success'] ?? false,
       token: json['token'] ?? json['data']?['token'],
@@ -120,11 +120,11 @@ class AuthService {
   ///   "documentType": "..."
   /// }
   Future<RegisterResponse> register({
-    required String firstName,
-    required String lastName,
+    required String first_name,
+    required String last_name,
     required String email,
     required String phone,
-    required String dateOfBirth,
+    required String date_of_birth,
     required String password,
     String? country,
     String? documentType,
@@ -134,12 +134,14 @@ class AuthService {
 
       // Prepare request body
       final requestBody = {
-        'firstName': firstName,
-        'lastName': lastName,
+        'first_name': first_name,
+        'last_name': last_name,
         'email': email,
         'phone': phone,
-        'dateOfBirth': dateOfBirth,
+        'date_of_birth': date_of_birth,
         'password': password,
+        'password_confirmation':
+            password, // Often required by backends expecting confirmation
       };
 
       // Add optional fields if provided
@@ -232,6 +234,13 @@ class AuthService {
     try {
       final url = Uri.parse('$_baseUrl/auth/login');
 
+      print('🔵 LOGIN API CALL');
+      print('📍 URL: $url');
+      print('📤 Request Body: ${jsonEncode({
+            'email': email,
+            'password': '***'
+          })}');
+
       final response = await http
           .post(
         url,
@@ -252,6 +261,9 @@ class AuthService {
         },
       );
 
+      print('📥 Response Status Code: ${response.statusCode}');
+      print('📥 Response Body: ${response.body}');
+
       // Handle empty response body
       if (response.body.isEmpty) {
         return LoginResponse(
@@ -263,7 +275,9 @@ class AuthService {
       Map<String, dynamic> responseData;
       try {
         responseData = jsonDecode(response.body) as Map<String, dynamic>;
+        print('📋 Parsed Response Data: $responseData');
       } catch (e) {
+        print('❌ Failed to parse response: $e');
         return LoginResponse(
           success: false,
           message: 'Invalid response format from server. Please try again.',
@@ -271,7 +285,10 @@ class AuthService {
       }
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        return LoginResponse.fromJson(responseData);
+        final loginResponse = LoginResponse.fromJson(responseData);
+        print(
+            '✅ LoginResponse created - success: ${loginResponse.success}, token: ${loginResponse.token != null ? "present" : "null"}, user: ${loginResponse.user != null ? "present" : "null"}');
+        return loginResponse;
       } else {
         // Handle error response
         return LoginResponse(

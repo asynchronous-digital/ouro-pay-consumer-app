@@ -3,12 +3,14 @@ class Wallet {
   final double amount;
   final String symbol;
   final String displayName;
+  final bool hasError; // Flag to indicate if wallet data failed to load
 
   const Wallet({
     required this.currency,
     required this.amount,
     required this.symbol,
     required this.displayName,
+    this.hasError = false,
   });
 
   Wallet copyWith({
@@ -16,12 +18,14 @@ class Wallet {
     double? amount,
     String? symbol,
     String? displayName,
+    bool? hasError,
   }) {
     return Wallet(
       currency: currency ?? this.currency,
       amount: amount ?? this.amount,
       symbol: symbol ?? this.symbol,
       displayName: displayName ?? this.displayName,
+      hasError: hasError ?? this.hasError,
     );
   }
 
@@ -31,6 +35,7 @@ class Wallet {
       'amount': amount,
       'symbol': symbol,
       'displayName': displayName,
+      'hasError': hasError,
     };
   }
 
@@ -40,10 +45,14 @@ class Wallet {
       amount: json['amount'].toDouble(),
       symbol: json['symbol'],
       displayName: json['displayName'],
+      hasError: json['hasError'] ?? false,
     );
   }
 
   String get formattedAmount {
+    if (hasError) {
+      return 'N/A';
+    }
     return '$symbol${amount.toStringAsFixed(2)}';
   }
 }

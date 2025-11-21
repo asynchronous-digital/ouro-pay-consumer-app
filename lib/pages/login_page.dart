@@ -418,19 +418,44 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
           });
 
           if (response.success) {
+            print('🟢 ========== LOGIN SUCCESS ==========');
+            print('📦 Full Response Data: ${response.data}');
+            print('🔑 Token: ${response.token}');
+            print('👤 User from response.user: ${response.user}');
+            print(
+                '👤 User from response.data[\'user\']: ${response.data?['user']}');
+
             // Save token if available
             if (response.token != null) {
               await authService.saveToken(response.token!);
+              print('✅ Token saved to SharedPreferences: ${response.token}');
+            } else {
+              print('⚠️ No token found in response');
             }
 
             // Save user data if available
+            Map<String, dynamic>? userDataToSave;
             if (response.user != null) {
+              userDataToSave = response.user!;
               await authService.saveUserData(response.user!);
+              print('✅ User data saved from response.user');
             } else if (response.data != null &&
                 response.data!['user'] != null) {
-              await authService
-                  .saveUserData(response.data!['user'] as Map<String, dynamic>);
+              userDataToSave = response.data!['user'] as Map<String, dynamic>;
+              await authService.saveUserData(userDataToSave);
+              print('✅ User data saved from response.data[\'user\']');
+            } else {
+              print('⚠️ No user data found in response');
             }
+
+            if (userDataToSave != null) {
+              print('💾 User Data Saved to SharedPreferences:');
+              print('   - Raw JSON: $userDataToSave');
+              userDataToSave.forEach((key, value) {
+                print('   - $key: $value');
+              });
+            }
+            print('🟢 ====================================');
 
             // Show success message
             ScaffoldMessenger.of(context).showSnackBar(
@@ -443,6 +468,11 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
             // Navigate to dashboard
             Navigator.pushReplacementNamed(context, '/dashboard');
           } else {
+            print('🔴 ========== LOGIN FAILED ==========');
+            print('❌ Message: ${response.message}');
+            print('📦 Full Response Data: ${response.data}');
+            print('🔴 ====================================');
+
             // Show error message
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
