@@ -300,6 +300,126 @@ class GoldService {
       );
     }
   }
+
+  // ---------------------------------------------------------------------
+  // BUY GOLD
+  // ---------------------------------------------------------------------
+  /// Buy gold for a specific currency and amount (grams)
+  /// POST {{base_url}}/gold/buy with body {"grams":..., "currency_code":...}
+  Future<GoldActionResponse> buyGold(
+      {required String currency, required double grams}) async {
+    try {
+      final authService = AuthService();
+      final token = await authService.getToken();
+      if (token == null) {
+        return GoldActionResponse(
+            success: false, message: 'No authentication token found');
+      }
+      final url = Uri.parse('$_baseUrl/gold/buy');
+      final body = jsonEncode({'grams': grams, 'currency_code': currency});
+      final response = await http
+          .post(url,
+              headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'Authorization': 'Bearer $token',
+              },
+              body: body)
+          .timeout(AppConfig.connectionTimeout, onTimeout: () {
+        throw Exception(
+            'Connection timeout. Please check your internet connection.');
+      });
+
+      if (response.body.isEmpty) {
+        return GoldActionResponse(
+            success: false, message: 'Empty response from server');
+      }
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      return GoldActionResponse(
+        success: data['success'] ?? false,
+        message: data['message'] ?? 'Buy gold request completed',
+      );
+    } catch (e) {
+      return GoldActionResponse(success: false, message: e.toString());
+    }
+  }
+
+  // ---------------------------------------------------------------------
+  // SELL GOLD
+  // ---------------------------------------------------------------------
+  /// Sell gold for a specific currency and amount (grams)
+  /// POST {{base_url}}/gold/sell with body {"grams":..., "currency_code":...}
+  Future<GoldActionResponse> sellGold(
+      {required String currency, required double grams}) async {
+    try {
+      final authService = AuthService();
+      final token = await authService.getToken();
+      if (token == null) {
+        return GoldActionResponse(
+            success: false, message: 'No authentication token found');
+      }
+      final url = Uri.parse('$_baseUrl/gold/sell');
+      final body = jsonEncode({'grams': grams, 'currency_code': currency});
+      final response = await http
+          .post(url,
+              headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'Authorization': 'Bearer $token',
+              },
+              body: body)
+          .timeout(AppConfig.connectionTimeout, onTimeout: () {
+        throw Exception(
+            'Connection timeout. Please check your internet connection.');
+      });
+
+      if (response.body.isEmpty) {
+        return GoldActionResponse(
+            success: false, message: 'Empty response from server');
+      }
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      return GoldActionResponse(
+        success: data['success'] ?? false,
+        message: data['message'] ?? 'Sell gold request completed',
+      );
+    } catch (e) {
+      return GoldActionResponse(success: false, message: e.toString());
+    }
+  }
+
+  // ---------------------------------------------------------------------
+  // FETCH TRANSACTIONS
+  // ---------------------------------------------------------------------
+  /// Retrieve gold transaction history
+  /// GET {{base_url}}/gold/transactions
+  Future<GoldTransactionsResponse> getGoldTransactions() async {
+    try {
+      final authService = AuthService();
+      final token = await authService.getToken();
+      if (token == null) {
+        return GoldTransactionsResponse(
+            success: false, message: 'No authentication token found');
+      }
+      final url = Uri.parse('$_baseUrl/gold/transactions');
+      final response = await http.get(url, headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'Authorization': 'Bearer $token',
+      }).timeout(AppConfig.connectionTimeout, onTimeout: () {
+        throw Exception(
+            'Connection timeout. Please check your internet connection.');
+      });
+
+      if (response.body.isEmpty) {
+        return GoldTransactionsResponse(
+            success: false, message: 'Empty response from server');
+      }
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      return GoldTransactionsResponse.fromJson(data);
+    } catch (e) {
+      return GoldTransactionsResponse(success: false, message: e.toString());
+    }
+  }
 }
 
 /// Gold price data model
@@ -394,6 +514,27 @@ class GoldPriceResponse {
       success: json['success'] ?? false,
       message: json['message'],
       data: data,
+    );
+  }
+}
+
+// ---------- Top-level response models ----------
+class GoldActionResponse {
+  final bool success;
+  final String? message;
+  GoldActionResponse({required this.success, this.message});
+}
+
+class GoldTransactionsResponse {
+  final bool success;
+  final String? message;
+  final List<dynamic>? data; // raw list of transactions
+  GoldTransactionsResponse({required this.success, this.message, this.data});
+  factory GoldTransactionsResponse.fromJson(Map<String, dynamic> json) {
+    return GoldTransactionsResponse(
+      success: json['success'] ?? false,
+      message: json['message'],
+      data: json['data']?['data'] as List<dynamic>?,
     );
   }
 }
