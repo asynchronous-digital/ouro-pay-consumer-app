@@ -674,6 +674,172 @@ class _DashboardPageState extends State<DashboardPage>
     );
   }
 
+  Widget _buildShimmerGoldHoldings() {
+    return Shimmer.fromColors(
+      baseColor: AppColors.cardBackground.withOpacity(0.6),
+      highlightColor: AppColors.cardBackground.withOpacity(0.3),
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: AppColors.cardBackground.withOpacity(0.3),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color: AppColors.primaryGold.withOpacity(0.1),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Container(
+                  width: 120,
+                  height: 16,
+                  decoration: BoxDecoration(
+                    color: AppColors.greyText,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                Container(
+                  width: 24,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryGold,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Container(
+              width: 180,
+              height: 36,
+              decoration: BoxDecoration(
+                color: AppColors.greyText,
+                borderRadius: BorderRadius.circular(4),
+              ),
+            ),
+            const SizedBox(height: 4),
+            Container(
+              width: 100,
+              height: 14,
+              decoration: BoxDecoration(
+                color: AppColors.greyText,
+                borderRadius: BorderRadius.circular(4),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildShimmerCurrencyValues() {
+    return Card(
+      child: Shimmer.fromColors(
+        baseColor: AppColors.cardBackground.withOpacity(0.6),
+        highlightColor: AppColors.cardBackground.withOpacity(0.3),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Container(
+                    width: 80,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: AppColors.greyText,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Container(
+                        width: 100,
+                        height: 14,
+                        decoration: BoxDecoration(
+                          color: AppColors.greyText,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Container(
+                        width: 100,
+                        height: 14,
+                        decoration: BoxDecoration(
+                          color: AppColors.greyText,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              const Divider(color: AppColors.greyText),
+              const SizedBox(height: 16),
+              Container(
+                width: 150,
+                height: 16,
+                decoration: BoxDecoration(
+                  color: AppColors.greyText,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+              const SizedBox(height: 12),
+              // Shimmer rows for currencies
+              for (int i = 0; i < 3; i++) ...[
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: AppColors.greyText,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            width: 60,
+                            height: 12,
+                            decoration: BoxDecoration(
+                              color: AppColors.greyText,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Container(
+                            width: 100,
+                            height: 16,
+                            decoration: BoxDecoration(
+                              color: AppColors.greyText,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildGoldTab() {
     return RefreshIndicator(
       onRefresh: _refreshData,
@@ -683,187 +849,192 @@ class _DashboardPageState extends State<DashboardPage>
         padding: const EdgeInsets.all(16),
         children: [
           // Gold holdings card
-          Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [
-                  AppColors.primaryGold.withOpacity(0.2),
-                  AppColors.primaryGold.withOpacity(0.05),
-                ],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(
-                color: AppColors.primaryGold.withOpacity(0.3),
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Total Gold Holdings',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: AppColors.greyText,
-                        fontWeight: FontWeight.w500,
+          _isLoadingGold
+              ? _buildShimmerGoldHoldings()
+              : Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        AppColors.primaryGold.withOpacity(0.2),
+                        AppColors.primaryGold.withOpacity(0.05),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(
+                      color: AppColors.primaryGold.withOpacity(0.3),
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Total Gold Holdings',
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: AppColors.greyText,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          Icon(
+                            Icons.stars,
+                            color: AppColors.primaryGold,
+                            size: 24,
+                          ),
+                        ],
                       ),
-                    ),
-                    Icon(
-                      Icons.stars,
-                      color: AppColors.primaryGold,
-                      size: 24,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  _isLoadingGold
-                      ? 'Loading...'
-                      : _totalGoldGrams != null
-                          ? '${_totalGoldGrams!.toStringAsFixed(3)} g'
-                          : '0.000 g',
-                  style: const TextStyle(
-                    fontSize: 36,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.whiteText,
-                    letterSpacing: -1.0,
+                      const SizedBox(height: 12),
+                      Text(
+                        _totalGoldGrams != null
+                            ? '${_totalGoldGrams!.toStringAsFixed(3)} g'
+                            : '0.000 g',
+                        style: const TextStyle(
+                          fontSize: 36,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.whiteText,
+                          letterSpacing: -1.0,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '≈ \$${((_totalGoldGrams ?? 0) * (_goldPriceData?.sellPrice ?? 0)).toStringAsFixed(2)} USD',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: AppColors.greyText.withOpacity(0.8),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  '≈ \$${((_totalGoldGrams ?? 0) * (_goldPriceData?.sellPrice ?? 0)).toStringAsFixed(2)} USD',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: AppColors.greyText.withOpacity(0.8),
-                  ),
-                ),
-              ],
-            ),
-          ),
 
           const SizedBox(height: 16),
 
           // Currency Values Card
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Currency selector and price display
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      // Currency dropdown
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: AppColors.darkBackground,
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                              color: AppColors.greyText.withOpacity(0.3)),
-                        ),
-                        child: DropdownButtonHideUnderline(
-                          child: DropdownButton<String>(
-                            value: _selectedCurrency,
-                            dropdownColor: AppColors.cardBackground,
-                            icon: const Icon(Icons.arrow_drop_down,
-                                color: AppColors.primaryGold),
-                            style: const TextStyle(
-                              color: AppColors.whiteText,
-                              fontWeight: FontWeight.bold,
+          _isLoadingGold || _isLoadingGoldPrice
+              ? _buildShimmerCurrencyValues()
+              : Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Currency selector and price display
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            // Currency dropdown
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 12, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: AppColors.darkBackground,
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                    color: AppColors.greyText.withOpacity(0.3)),
+                              ),
+                              child: DropdownButtonHideUnderline(
+                                child: DropdownButton<String>(
+                                  value: _selectedCurrency,
+                                  dropdownColor: AppColors.cardBackground,
+                                  icon: const Icon(Icons.arrow_drop_down,
+                                      color: AppColors.primaryGold),
+                                  style: const TextStyle(
+                                    color: AppColors.whiteText,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                  items: ['EUR', 'USD', 'SRD']
+                                      .map((c) => DropdownMenuItem(
+                                          value: c, child: Text(c)))
+                                      .toList(),
+                                  onChanged: (val) {
+                                    if (val != null) {
+                                      setState(() {
+                                        _selectedCurrency = val;
+                                      });
+                                      _loadGoldPrice(currency: val);
+                                    }
+                                  },
+                                ),
+                              ),
                             ),
-                            items: ['EUR', 'USD', 'SRD']
-                                .map((c) =>
-                                    DropdownMenuItem(value: c, child: Text(c)))
-                                .toList(),
-                            onChanged: (val) {
-                              if (val != null) {
-                                setState(() {
-                                  _selectedCurrency = val;
-                                });
-                                _loadGoldPrice(currency: val);
-                              }
-                            },
+                            // Price display
+                            _isLoadingGoldPrice
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2))
+                                : _goldPriceData != null
+                                    ? Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.end,
+                                        children: [
+                                          Text(
+                                            'Buy: ${_goldPriceData!.getFormattedBuyPrice()}',
+                                            style: const TextStyle(
+                                                color: AppColors.successGreen,
+                                                fontWeight: FontWeight.bold),
+                                          ),
+                                          Text(
+                                            'Sell: ${_goldPriceData!.getFormattedSellPrice()}',
+                                            style: const TextStyle(
+                                                color: AppColors.errorRed,
+                                                fontWeight: FontWeight.bold),
+                                          ),
+                                        ],
+                                      )
+                                    : const Text('Select a currency',
+                                        style: TextStyle(
+                                            color: AppColors.greyText)),
+                          ],
+                        ),
+
+                        const SizedBox(height: 20),
+                        const Divider(color: AppColors.greyText),
+                        const SizedBox(height: 16),
+
+                        // Currency values (existing)
+                        const Text(
+                          'Value by Currency',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.whiteText,
                           ),
                         ),
-                      ),
-                      // Price display
-                      _isLoadingGoldPrice
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2))
-                          : _goldPriceData != null
-                              ? Column(
-                                  crossAxisAlignment: CrossAxisAlignment.end,
-                                  children: [
-                                    Text(
-                                      'Buy: ${_goldPriceData!.getFormattedBuyPrice()}',
-                                      style: const TextStyle(
-                                          color: AppColors.successGreen,
-                                          fontWeight: FontWeight.bold),
-                                    ),
-                                    Text(
-                                      'Sell: ${_goldPriceData!.getFormattedSellPrice()}',
-                                      style: const TextStyle(
-                                          color: AppColors.errorRed,
-                                          fontWeight: FontWeight.bold),
-                                    ),
-                                  ],
-                                )
-                              : const Text('Select a currency',
-                                  style: TextStyle(color: AppColors.greyText)),
-                    ],
-                  ),
+                        const SizedBox(height: 12),
 
-                  const SizedBox(height: 20),
-                  const Divider(color: AppColors.greyText),
-                  const SizedBox(height: 16),
+                        // EUR
+                        _buildCurrencyValueRow(
+                          'EUR',
+                          '€',
+                          AppColors.euroColor,
+                        ),
+                        const SizedBox(height: 12),
 
-                  // Currency values (existing)
-                  const Text(
-                    'Value by Currency',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.whiteText,
+                        // USD
+                        _buildCurrencyValueRow(
+                          'USD',
+                          '\$',
+                          AppColors.usdColor,
+                        ),
+                        const SizedBox(height: 12),
+
+                        // SRD
+                        _buildCurrencyValueRow(
+                          'SRD',
+                          'Sr\$',
+                          AppColors.srdColor,
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 12),
-
-                  // EUR
-                  _buildCurrencyValueRow(
-                    'EUR',
-                    '€',
-                    AppColors.euroColor,
-                  ),
-                  const SizedBox(height: 12),
-
-                  // USD
-                  _buildCurrencyValueRow(
-                    'USD',
-                    '\$',
-                    AppColors.usdColor,
-                  ),
-                  const SizedBox(height: 12),
-
-                  // SRD
-                  _buildCurrencyValueRow(
-                    'SRD',
-                    'Sr\$',
-                    AppColors.srdColor,
-                  ),
-                ],
-              ),
-            ),
-          ),
+                ),
 
           const SizedBox(height: 20),
 
