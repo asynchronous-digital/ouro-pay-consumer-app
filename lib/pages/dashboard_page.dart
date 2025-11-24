@@ -662,9 +662,11 @@ class _DashboardPageState extends State<DashboardPage>
               const SizedBox(width: 12),
               Expanded(
                 child: _buildActionButton(
-                  icon: Icons.send,
-                  label: 'Send Money',
-                  onPressed: () => _showComingSoon(),
+                  icon: Icons.swap_horiz,
+                  label: 'Transfer',
+                  onPressed: () {
+                    Navigator.pushNamed(context, '/conversion');
+                  },
                 ),
               ),
             ],
