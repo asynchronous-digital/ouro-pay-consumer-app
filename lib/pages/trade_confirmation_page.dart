@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:ouro_pay_consumer_app/services/gold_service.dart';
 import 'package:ouro_pay_consumer_app/services/wallet_service.dart';
 import 'package:ouro_pay_consumer_app/theme/app_theme.dart';
+import 'package:ouro_pay_consumer_app/pages/gold_transactions_page.dart';
 
 class TradeConfirmationPage extends StatefulWidget {
   final bool isBuy;
@@ -29,6 +30,7 @@ class _TradeConfirmationPageState extends State<TradeConfirmationPage> {
   bool _isLoading = false;
   bool _isPriceLoading = false;
   bool _isBalanceLoading = false;
+  double _availableGoldHoldings = 0.0;
 
   @override
   void initState() {
@@ -38,6 +40,8 @@ class _TradeConfirmationPageState extends State<TradeConfirmationPage> {
     _gramsController.addListener(_updateTotal);
     if (widget.isBuy) {
       _fetchBalance();
+    } else {
+      _fetchHoldings();
     }
   }
 
@@ -86,6 +90,24 @@ class _TradeConfirmationPageState extends State<TradeConfirmationPage> {
     } catch (e) {
       if (mounted) setState(() => _isBalanceLoading = false);
     }
+  }
+
+  Future<double> _fetchHoldings() async {
+    try {
+      final service = GoldService();
+      final response = await service.getGoldHoldings();
+      if (response.success && response.data != null) {
+        if (mounted) {
+          setState(() {
+            _availableGoldHoldings = response.data!.totalGrams;
+          });
+        }
+        return response.data!.totalGrams;
+      }
+    } catch (e) {
+      // ignore errors
+    }
+    return 0.0;
   }
 
   Future<void> _updateCurrency(String? newCurrency) async {
@@ -148,6 +170,16 @@ class _TradeConfirmationPageState extends State<TradeConfirmationPage> {
       return;
     }
 
+    if (!widget.isBuy && grams > _availableGoldHoldings) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Insufficient gold holdings'),
+          backgroundColor: AppColors.errorRed,
+        ),
+      );
+      return;
+    }
+
     setState(() => _isLoading = true);
     final service = GoldService();
     final resp = widget.isBuy
@@ -157,19 +189,54 @@ class _TradeConfirmationPageState extends State<TradeConfirmationPage> {
     if (mounted) {
       setState(() => _isLoading = false);
       if (resp.success) {
+        if (widget.isBuy) {
+          await _fetchBalance();
+        }
+        await _fetchHoldings();
+
+        if (!mounted) return;
+
         showDialog(
           context: context,
           barrierDismissible: false,
           builder: (_) => AlertDialog(
             title: const Text('Success'),
-            content: Text(resp.message ?? 'Transaction completed successfully'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  resp.message ?? 'Transaction completed successfully',
+                  style: const TextStyle(color: AppColors.greyText),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Your new gold balance: ${_availableGoldHoldings.toStringAsFixed(3)}g',
+                  style: const TextStyle(
+                      color: AppColors.primaryGold,
+                      fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
             actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop(); // Close dialog
+                  Navigator.of(context).pushReplacement(
+                    MaterialPageRoute(
+                        builder: (_) => const GoldTransactionsPage()),
+                  );
+                },
+                child: const Text('View Transactions',
+                    style: TextStyle(color: AppColors.primaryGold)),
+              ),
               TextButton(
                 onPressed: () {
                   Navigator.of(context).pop(); // Close dialog
                   Navigator.of(context).pop(true); // Return to previous screen
                 },
-                child: const Text('OK'),
+                child: const Text('OK',
+                    style: TextStyle(color: AppColors.whiteText)),
               ),
             ],
           ),
@@ -239,6 +306,9 @@ class _TradeConfirmationPageState extends State<TradeConfirmationPage> {
     final color = widget.isBuy ? AppColors.successGreen : AppColors.errorRed;
     final hasInsufficientFunds =
         widget.isBuy && _totalValue > _availableBalance;
+    final hasInsufficientGold = !widget.isBuy &&
+        (double.tryParse(_gramsController.text) ?? 0.0) >
+            _availableGoldHoldings;
 
     return Scaffold(
       appBar: AppBar(
@@ -258,7 +328,7 @@ class _TradeConfirmationPageState extends State<TradeConfirmationPage> {
                     color: AppColors.cardBackground,
                     borderRadius: BorderRadius.circular(20),
                     border: Border.all(
-                        color: AppColors.primaryGold.withOpacity(0.5)),
+                        color: AppColors.primaryGold.withValues(alpha: 0.5)),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -301,14 +371,15 @@ class _TradeConfirmationPageState extends State<TradeConfirmationPage> {
                   const TextInputType.numberWithOptions(decimal: true),
               inputFormatters: [
                 FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,3}')),
+                if (!widget.isBuy) MaxAmountFormatter(_availableGoldHoldings),
               ],
               style: const TextStyle(color: AppColors.whiteText, fontSize: 24),
               decoration: InputDecoration(
                 suffixText: 'grams',
                 suffixStyle: const TextStyle(color: AppColors.primaryGold),
                 enabledBorder: OutlineInputBorder(
-                  borderSide:
-                      BorderSide(color: AppColors.greyText.withOpacity(0.3)),
+                  borderSide: BorderSide(
+                      color: AppColors.greyText.withValues(alpha: 0.3)),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 focusedBorder: OutlineInputBorder(
@@ -323,7 +394,8 @@ class _TradeConfirmationPageState extends State<TradeConfirmationPage> {
               decoration: BoxDecoration(
                 color: AppColors.cardBackground,
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.greyText.withOpacity(0.1)),
+                border: Border.all(
+                    color: AppColors.greyText.withValues(alpha: 0.1)),
               ),
               child: Column(
                 children: [
@@ -397,6 +469,47 @@ class _TradeConfirmationPageState extends State<TradeConfirmationPage> {
                               ),
                       ],
                     ),
+                  ] else ...[
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Current Gold Balance',
+                            style: TextStyle(
+                                color: AppColors.greyText, fontSize: 14)),
+                        Text(
+                          '${_availableGoldHoldings.toStringAsFixed(3)}g',
+                          style: const TextStyle(
+                            color: AppColors.whiteText,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text('Estimated Remaining Gold',
+                            style: TextStyle(
+                                color: AppColors.greyText, fontSize: 14)),
+                        Text(
+                          '${(_availableGoldHoldings - (double.tryParse(_gramsController.text) ?? 0.0)).toStringAsFixed(3)}g',
+                          style: TextStyle(
+                            color: (_availableGoldHoldings -
+                                        (double.tryParse(
+                                                _gramsController.text) ??
+                                            0.0)) <
+                                    0
+                                ? AppColors.errorRed
+                                : AppColors.primaryGold,
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
                   ],
                 ],
               ),
@@ -405,12 +518,15 @@ class _TradeConfirmationPageState extends State<TradeConfirmationPage> {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: _isLoading || _isPriceLoading || hasInsufficientFunds
+                onPressed: _isLoading ||
+                        _isPriceLoading ||
+                        hasInsufficientFunds ||
+                        hasInsufficientGold
                     ? null
                     : _confirmTrade,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: color,
-                  disabledBackgroundColor: color.withOpacity(0.3),
+                  disabledBackgroundColor: color.withValues(alpha: 0.3),
                   padding: const EdgeInsets.symmetric(vertical: 18),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -426,7 +542,9 @@ class _TradeConfirmationPageState extends State<TradeConfirmationPage> {
                     : Text(
                         hasInsufficientFunds
                             ? 'Insufficient Funds'
-                            : 'Confirm $action',
+                            : hasInsufficientGold
+                                ? 'Insufficient Gold'
+                                : 'Confirm $action',
                         style: const TextStyle(
                             fontSize: 18, fontWeight: FontWeight.bold),
                       ),
@@ -436,5 +554,37 @@ class _TradeConfirmationPageState extends State<TradeConfirmationPage> {
         ),
       ),
     );
+  }
+}
+
+class MaxAmountFormatter extends TextInputFormatter {
+  final double maxAmount;
+
+  MaxAmountFormatter(this.maxAmount);
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    if (newValue.text.isEmpty) {
+      return newValue;
+    }
+
+    // Allow partial inputs like "." or ".1" while typing
+    if (newValue.text == '.' || newValue.text.startsWith('.')) {
+      return newValue;
+    }
+
+    final newAmount = double.tryParse(newValue.text);
+    if (newAmount == null) {
+      return oldValue;
+    }
+
+    if (newAmount > maxAmount) {
+      return oldValue;
+    }
+
+    return newValue;
   }
 }
