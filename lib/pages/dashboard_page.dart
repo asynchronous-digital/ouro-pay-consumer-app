@@ -13,6 +13,7 @@ import 'package:ouro_pay_consumer_app/pages/add_money_page.dart';
 import 'package:ouro_pay_consumer_app/pages/deposit_history_page.dart';
 import 'package:ouro_pay_consumer_app/utils/debug_prefs.dart';
 import 'package:shimmer/shimmer.dart';
+import 'package:flutter/services.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -32,7 +33,7 @@ class _DashboardPageState extends State<DashboardPage>
   double? _totalGoldGrams; // Total gold in grams
   bool _isLoadingGoldPrice = false; // Loading state for gold price
   GoldPriceData? _goldPriceData; // Current gold price data
-  String _selectedCurrency = 'EUR'; // Currently selected currency for price
+  String _selectedCurrency = 'USD'; // Currently selected currency for price
 
   @override
   void initState() {
@@ -208,6 +209,16 @@ class _DashboardPageState extends State<DashboardPage>
           setState(() {
             _goldCurrentValues = response.data!.currentValues;
             _totalGoldGrams = response.data!.totalGrams;
+
+            // Update portfolio gold holding
+            _portfolio = _portfolio.copyWith(
+              goldHolding: _portfolio.goldHolding.copyWith(
+                grams: response.data!.totalGrams,
+                lastUpdated: DateTime.now(),
+              ),
+              lastUpdated: DateTime.now(),
+            );
+
             _isLoadingGold = false;
           });
           print(
@@ -235,6 +246,9 @@ class _DashboardPageState extends State<DashboardPage>
       }
     }
   }
+
+  // State variables
+  bool _isBalanceVisible = true; // New state variable
 
   Future<void> _loadGoldPrice({String? currency}) async {
     setState(() {
@@ -295,42 +309,58 @@ class _DashboardPageState extends State<DashboardPage>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.darkBackground,
-      appBar: _buildAppBar(),
-      body: Column(
-        children: [
-          // Portfolio overview card
-          _buildPortfolioOverview(),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        if (Platform.isAndroid) {
+          try {
+            const platform = MethodChannel('com.ouropay.consumer/app');
+            await platform.invokeMethod('minimizeApp');
+          } catch (e) {
+            print("Failed to minimize app: $e");
+          }
+        }
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.darkBackground,
+        appBar: _buildAppBar(),
+        body: Column(
+          children: [
+            // Portfolio overview card
+            _buildPortfolioOverview(),
 
-          // Tab bar
-          Container(
-            color: AppColors.cardBackground,
-            child: TabBar(
-              controller: _tabController,
-              indicatorColor: AppColors.primaryGold,
-              labelColor: AppColors.primaryGold,
-              unselectedLabelColor: AppColors.greyText,
-              tabs: const [
-                Tab(text: 'Wallets', icon: Icon(Icons.account_balance_wallet)),
-                Tab(text: 'Gold', icon: Icon(Icons.stars)),
-                Tab(text: 'Trade', icon: Icon(Icons.trending_up)),
-              ],
+            // Tab bar
+            Container(
+              color: AppColors.cardBackground,
+              child: TabBar(
+                controller: _tabController,
+                indicatorColor: AppColors.primaryGold,
+                labelColor: AppColors.primaryGold,
+                unselectedLabelColor: AppColors.greyText,
+                tabs: const [
+                  Tab(
+                      text: 'Wallets',
+                      icon: Icon(Icons.account_balance_wallet)),
+                  Tab(text: 'Gold', icon: Icon(Icons.stars)),
+                  Tab(text: 'Trade', icon: Icon(Icons.trending_up)),
+                ],
+              ),
             ),
-          ),
 
-          // Tab content
-          Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                _buildWalletsTab(),
-                _buildGoldTab(),
-                _buildTradeTab(),
-              ],
+            // Tab content
+            Expanded(
+              child: TabBarView(
+                controller: _tabController,
+                children: [
+                  _buildWalletsTab(),
+                  _buildGoldTab(),
+                  _buildTradeTab(),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -339,6 +369,7 @@ class _DashboardPageState extends State<DashboardPage>
     return AppBar(
       backgroundColor: AppColors.darkBackground,
       elevation: 0,
+      automaticallyImplyLeading: false, // Remove back button
       title: Row(
         children: [
           // Logo
@@ -417,6 +448,12 @@ class _DashboardPageState extends State<DashboardPage>
   }
 
   Widget _buildPortfolioOverview() {
+    // Calculate total value in gold
+    // Use current buy price if available, otherwise fallback to holding price
+
+    // Use the API-provided value for USD, or fallback to 0.0
+    final double totalValueInGold = _goldCurrentValues?['usd'] ?? 0.0;
+
     return Container(
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(20),
@@ -440,16 +477,27 @@ class _DashboardPageState extends State<DashboardPage>
                         fontWeight: FontWeight.w600,
                       ),
                     ),
-                    Icon(
-                      Icons.visibility,
-                      color: AppColors.darkBackground.withOpacity(0.7),
-                      size: 20,
+                    GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _isBalanceVisible = !_isBalanceVisible;
+                        });
+                      },
+                      child: Icon(
+                        _isBalanceVisible
+                            ? Icons.visibility
+                            : Icons.visibility_off,
+                        color: AppColors.darkBackground.withOpacity(0.7),
+                        size: 20,
+                      ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  '\$${_portfolio.totalPortfolioValue.toStringAsFixed(2)}',
+                  _isBalanceVisible
+                      ? '\$${totalValueInGold.toStringAsFixed(2)}'
+                      : '******',
                   style: const TextStyle(
                     fontSize: 32,
                     fontWeight: FontWeight.bold,
@@ -457,13 +505,21 @@ class _DashboardPageState extends State<DashboardPage>
                   ),
                 ),
                 const SizedBox(height: 4),
-                Text(
-                  '+\$0.00 (0.00%) today',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: AppColors.darkBackground.withOpacity(0.8),
+                if (_goldPriceData != null)
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Buy: ${_goldPriceData!.getFormattedBuyPrice()} | Sell: ${_goldPriceData!.getFormattedSellPrice()}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.darkBackground.withOpacity(0.8),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                    ],
                   ),
-                ),
               ],
             ),
     );
