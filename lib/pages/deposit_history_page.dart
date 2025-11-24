@@ -26,7 +26,9 @@ class _DepositHistoryPageState extends State<DepositHistoryPage> {
 
   Future<void> _loadDeposits() async {
     setState(() {
-      _isLoading = true;
+      if (_deposits.isEmpty) {
+        _isLoading = true;
+      }
       _errorMessage = null;
     });
 
@@ -75,88 +77,92 @@ class _DepositHistoryPageState extends State<DepositHistoryPage> {
           onPressed: () => Navigator.pop(context),
         ),
       ),
-      body: RefreshIndicator(
-        onRefresh: _loadDeposits,
-        color: AppColors.primaryGold,
-        backgroundColor: AppColors.cardBackground,
-        child: _buildBody(),
-      ),
-    );
-  }
-
-  Widget _buildBody() {
-    if (_isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(
-          color: AppColors.primaryGold,
-        ),
-      );
-    }
-
-    if (_errorMessage != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(
-                Icons.error_outline,
-                color: AppColors.errorRed,
-                size: 64,
+      body: _isLoading
+          ? const Center(
+              child: CircularProgressIndicator(
+                color: AppColors.primaryGold,
               ),
-              const SizedBox(height: 16),
-              Text(
-                _errorMessage!,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: AppColors.whiteText,
-                  fontSize: 16,
-                ),
-              ),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: _loadDeposits,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primaryGold,
-                ),
-                child: const Text('Retry'),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    if (_deposits.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.inbox_outlined,
-              color: AppColors.greyText.withOpacity(0.5),
-              size: 64,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'No deposits yet',
-              style: TextStyle(
-                color: AppColors.greyText.withOpacity(0.7),
-                fontSize: 18,
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: _deposits.length,
-      itemBuilder: (context, index) {
-        return _buildDepositCard(_deposits[index]);
-      },
+            )
+          : _errorMessage != null
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.error_outline,
+                          size: 64,
+                          color: AppColors.errorRed.withOpacity(0.5),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          _errorMessage!,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: AppColors.greyText,
+                            fontSize: 16,
+                          ),
+                        ),
+                        const SizedBox(height: 24),
+                        ElevatedButton(
+                          onPressed: _loadDeposits,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primaryGold,
+                            foregroundColor: AppColors.darkBackground,
+                          ),
+                          child: const Text('Retry'),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              : _deposits.isEmpty
+                  ? Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              Icons.inbox_outlined,
+                              size: 64,
+                              color: AppColors.greyText.withOpacity(0.5),
+                            ),
+                            const SizedBox(height: 16),
+                            const Text(
+                              'No deposits yet',
+                              style: TextStyle(
+                                color: AppColors.greyText,
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            const Text(
+                              'Your deposit history will appear here',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: AppColors.greyText,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    )
+                  : RefreshIndicator(
+                      onRefresh: _loadDeposits,
+                      color: AppColors.primaryGold,
+                      backgroundColor: AppColors.cardBackground,
+                      child: ListView.builder(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: _deposits.length,
+                        itemBuilder: (context, index) {
+                          return _buildDepositCard(_deposits[index]);
+                        },
+                      ),
+                    ),
     );
   }
 

@@ -10,6 +10,8 @@ import 'package:ouro_pay_consumer_app/pages/trade_page.dart';
 import 'package:ouro_pay_consumer_app/pages/transactions_page.dart';
 import 'package:ouro_pay_consumer_app/pages/settings_page.dart';
 import 'package:ouro_pay_consumer_app/pages/profile_page.dart';
+import 'package:ouro_pay_consumer_app/pages/conversion_page.dart';
+import 'package:ouro_pay_consumer_app/pages/conversion_history_page.dart';
 import 'package:ouro_pay_consumer_app/services/auth_service.dart';
 import 'package:ouro_pay_consumer_app/widgets/logo.dart';
 
@@ -34,6 +36,8 @@ class OuroPayApp extends StatelessWidget {
         '/transactions': (context) => const TransactionsPage(),
         '/settings': (context) => const SettingsPage(),
         '/profile': (context) => const ProfilePage(),
+        '/conversion': (context) => const ConversionPage(),
+        '/conversion-history': (context) => const ConversionHistoryPage(),
       },
     );
   }
