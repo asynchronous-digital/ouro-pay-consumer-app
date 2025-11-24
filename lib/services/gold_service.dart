@@ -30,7 +30,15 @@ class GoldHoldingsData {
         'usd': (json['total_profit_loss']?['usd'] ?? 0).toDouble(),
         'srd': (json['total_profit_loss']?['srd'] ?? 0).toDouble(),
       },
-      investmentsByCurrency: json['investments_by_currency'] ?? [],
+      investmentsByCurrency: () {
+        final raw = json['investments_by_currency'];
+        print('🔍 Debug: investments_by_currency type: ${raw.runtimeType}');
+        print('🔍 Debug: investments_by_currency value: $raw');
+        if (raw is Map) {
+          return raw.values.toList();
+        }
+        return [];
+      }(),
     );
   }
 
