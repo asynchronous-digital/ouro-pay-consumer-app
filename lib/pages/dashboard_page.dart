@@ -1640,21 +1640,7 @@ class _DashboardPageState extends State<DashboardPage>
                   style: TextStyle(color: AppColors.whiteText)),
               onTap: () => _showComingSoon(),
             ),
-            const Divider(color: AppColors.greyText),
-            ListTile(
-              leading: const Icon(Icons.bug_report, color: AppColors.greyText),
-              title: const Text('Print Token (Debug)',
-                  style: TextStyle(color: AppColors.greyText)),
-              onTap: () async {
-                final authService = AuthService();
-                final token = await authService.getToken();
-                print('🔑 DEBUG TOKEN: $token');
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Token printed to console')),
-                );
-              },
-            ),
+
             const Divider(color: AppColors.greyText),
             ListTile(
               leading: const Icon(Icons.logout, color: AppColors.errorRed),

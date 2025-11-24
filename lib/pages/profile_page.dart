@@ -23,7 +23,6 @@ class _ProfilePageState extends State<ProfilePage> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Reload user data if not already loaded or if user is null
     if (_user == null && !_isLoading) {
       _loadUserData();
     }
@@ -33,10 +32,10 @@ class _ProfilePageState extends State<ProfilePage> {
     try {
       final authService = AuthService();
       final user = await authService.getCurrentUser();
-      
+
       print('👤 Profile: Loading user data');
       print('  User: ${user?.displayName ?? 'null'} (${user?.email ?? 'no email'})');
-      
+
       if (mounted) {
         setState(() {
           _user = user;
@@ -65,183 +64,183 @@ class _ProfilePageState extends State<ProfilePage> {
       ),
       body: _isLoading
           ? const Center(
-              child: CircularProgressIndicator(
-                color: AppColors.primaryGold,
-              ),
-            )
-          : Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Your Profile',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.whiteText,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Row(
-                        children: [
-                          CircleAvatar(
-                            radius: 30,
-                            backgroundColor: AppColors.primaryGold,
-                            child: _user != null && _user!.initials.isNotEmpty
-                                ? Text(
-                                    _user!.initials,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      color: AppColors.darkBackground,
-                                    ),
-                                  )
-                                : const Icon(
-                                    Icons.person,
-                                    color: AppColors.darkBackground,
-                                  ),
-                          ),
-                          const SizedBox(width: 16),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  _user?.displayName ?? 'User',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  _user?.email ?? 'No email',
-                                  style: const TextStyle(
-                                    color: AppColors.greyText,
-                                  ),
-                                ),
-                                if (_user?.isVerified == true) ...[
-                                  const SizedBox(height: 8),
-                                  Row(
-                                    children: [
-                                      Icon(
-                                        Icons.verified,
-                                        size: 16,
-                                        color: AppColors.successGreen,
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        'Verified',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: AppColors.successGreen,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  // User details section
-                  if (_user != null) ...[
-                    const Text(
-                      'Account Information',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.whiteText,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Card(
-                      child: Column(
-                        children: [
-                          ListTile(
-                            leading: const Icon(
-                              Icons.email,
-                              color: AppColors.primaryGold,
-                            ),
-                            title: const Text('Email'),
-                            subtitle: Text(_user!.email),
-                          ),
-                          const Divider(height: 1),
-                          ListTile(
-                            leading: const Icon(
-                              Icons.person,
-                              color: AppColors.primaryGold,
-                            ),
-                            title: const Text('Name'),
-                            subtitle: Text(_user!.displayName),
-                          ),
-                          if (_user!.firstName.isNotEmpty &&
-                              _user!.lastName.isNotEmpty) ...[
-                            const Divider(height: 1),
-                            ListTile(
-                              leading: const Icon(
-                                Icons.badge,
-                                color: AppColors.primaryGold,
-                              ),
-                              title: const Text('First Name'),
-                              subtitle: Text(_user!.firstName),
-                            ),
-                            const Divider(height: 1),
-                            ListTile(
-                              leading: const Icon(
-                                Icons.badge_outlined,
-                                color: AppColors.primaryGold,
-                              ),
-                              title: const Text('Last Name'),
-                              subtitle: Text(_user!.lastName),
-                            ),
-                          ],
-                          const Divider(height: 1),
-                          ListTile(
-                            leading: const Icon(
-                              Icons.calendar_today,
-                              color: AppColors.primaryGold,
-                            ),
-                            title: const Text('Member Since'),
-                            subtitle: Text(
-                              '${_user!.createdAt.day}/${_user!.createdAt.month}/${_user!.createdAt.year}',
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                  ],
-                  const SizedBox(height: 20),
-                  const Divider(color: AppColors.greyText),
-                  const SizedBox(height: 20),
-                  Card(
-                    child: ListTile(
-                      leading:
-                          const Icon(Icons.logout, color: AppColors.errorRed),
-                      title: const Text(
-                        'Logout',
-                        style: TextStyle(color: AppColors.errorRed),
-                      ),
-                      subtitle: const Text('Sign out of your account'),
-                      onTap: () => _handleLogout(context),
-                    ),
-                  ),
-                ],
+        child: CircularProgressIndicator(
+          color: AppColors.primaryGold,
+        ),
+      )
+          : SingleChildScrollView( // ✅ Wrap with SingleChildScrollView
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Your Profile',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: AppColors.whiteText,
               ),
             ),
+            const SizedBox(height: 12),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 30,
+                      backgroundColor: AppColors.primaryGold,
+                      child: _user != null && _user!.initials.isNotEmpty
+                          ? Text(
+                        _user!.initials,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.darkBackground,
+                        ),
+                      )
+                          : const Icon(
+                        Icons.person,
+                        color: AppColors.darkBackground,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _user?.displayName ?? 'User',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _user?.email ?? 'No email',
+                            style: const TextStyle(
+                              color: AppColors.greyText,
+                            ),
+                          ),
+                          if (_user?.isVerified == true) ...[
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.verified,
+                                  size: 16,
+                                  color: AppColors.successGreen,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Verified',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: AppColors.successGreen,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            // User details section
+            if (_user != null) ...[
+              const Text(
+                'Account Information',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.whiteText,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Card(
+                child: Column(
+                  children: [
+                    ListTile(
+                      leading: const Icon(
+                        Icons.email,
+                        color: AppColors.primaryGold,
+                      ),
+                      title: const Text('Email'),
+                      subtitle: Text(_user!.email),
+                    ),
+                    const Divider(height: 1),
+                    ListTile(
+                      leading: const Icon(
+                        Icons.person,
+                        color: AppColors.primaryGold,
+                      ),
+                      title: const Text('Name'),
+                      subtitle: Text(_user!.displayName),
+                    ),
+                    if (_user!.firstName.isNotEmpty &&
+                        _user!.lastName.isNotEmpty) ...[
+                      const Divider(height: 1),
+                      ListTile(
+                        leading: const Icon(
+                          Icons.badge,
+                          color: AppColors.primaryGold,
+                        ),
+                        title: const Text('First Name'),
+                        subtitle: Text(_user!.firstName),
+                      ),
+                      const Divider(height: 1),
+                      ListTile(
+                        leading: const Icon(
+                          Icons.badge_outlined,
+                          color: AppColors.primaryGold,
+                        ),
+                        title: const Text('Last Name'),
+                        subtitle: Text(_user!.lastName),
+                      ),
+                    ],
+                    const Divider(height: 1),
+                    ListTile(
+                      leading: const Icon(
+                        Icons.calendar_today,
+                        color: AppColors.primaryGold,
+                      ),
+                      title: const Text('Member Since'),
+                      subtitle: Text(
+                        '${_user!.createdAt.day}/${_user!.createdAt.month}/${_user!.createdAt.year}',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+            ],
+            const SizedBox(height: 20),
+            const Divider(color: AppColors.greyText),
+            const SizedBox(height: 20),
+            Card(
+              child: ListTile(
+                leading:
+                const Icon(Icons.logout, color: AppColors.errorRed),
+                title: const Text(
+                  'Logout',
+                  style: TextStyle(color: AppColors.errorRed),
+                ),
+                subtitle: const Text('Sign out of your account'),
+                onTap: () => _handleLogout(context),
+              ),
+            ),
+            const SizedBox(height: 20), // ✅ Add extra bottom padding
+          ],
+        ),
+      ),
     );
   }
 
   Future<void> _handleLogout(BuildContext context) async {
-    // Show confirmation dialog
     final shouldLogout = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -274,7 +273,6 @@ class _ProfilePageState extends State<ProfilePage> {
     );
 
     if (shouldLogout == true) {
-      // Show loading indicator
       showDialog(
         context: context,
         barrierDismissible: false,
@@ -290,16 +288,12 @@ class _ProfilePageState extends State<ProfilePage> {
         await authService.logout();
 
         if (context.mounted) {
-          Navigator.pop(context); // Close loading dialog
-
-          // Navigate to welcome page and clear navigation stack
+          Navigator.pop(context);
           Navigator.pushNamedAndRemoveUntil(
             context,
             '/welcome',
-            (route) => false,
+                (route) => false,
           );
-
-          // Show success message
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Logged out successfully'),
@@ -309,15 +303,12 @@ class _ProfilePageState extends State<ProfilePage> {
         }
       } catch (e) {
         if (context.mounted) {
-          Navigator.pop(context); // Close loading dialog
-
-          // Still navigate to welcome even if there's an error
+          Navigator.pop(context);
           Navigator.pushNamedAndRemoveUntil(
             context,
             '/welcome',
-            (route) => false,
+                (route) => false,
           );
-
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Logout completed: ${e.toString()}'),
