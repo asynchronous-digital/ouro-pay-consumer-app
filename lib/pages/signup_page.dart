@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import 'package:ouro_pay_consumer_app/widgets/logo.dart';
 import 'package:ouro_pay_consumer_app/services/auth_service.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
+import 'dart:io';
 
 class SignUpPage extends StatefulWidget {
   const SignUpPage({super.key});
@@ -16,7 +20,7 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
   late Animation<double> _fadeAnimation;
 
   int _currentStep = 0;
-  final int _totalSteps = 4;
+  final int _totalSteps = 5;
 
   // Form controllers
   final _personalFormKey = GlobalKey<FormState>();
@@ -27,6 +31,7 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   final _dobController = TextEditingController();
+  final _otpController = TextEditingController();
 
   // Field-specific error messages from API
   String? _firstNameError;
@@ -43,10 +48,20 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
   bool _selfieCompleted = false;
   bool _termsAccepted = false;
   bool _isStepOneSubmitting = false;
+  bool _isOtpSubmitting = false;
+
+  // Document file (single upload - PDF or photo)
+  File? _documentFile;
+  String? _documentPath;
+  final ImagePicker _imagePicker = ImagePicker();
 
   // Password visibility toggles
   bool _isPasswordVisible = false;
   bool _isConfirmPasswordVisible = false;
+
+  // Selfie state
+  File? _selfieFile;
+  String? _selfiePath;
 
   @override
   void initState() {
@@ -145,6 +160,7 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
                 physics: const NeverScrollableScrollPhysics(),
                 children: [
                   _buildPersonalInfoStep(),
+                  _buildOtpVerificationStep(),
                   _buildDocumentVerificationStep(),
                   _buildSelfieVerificationStep(),
                   _buildReviewAndSubmitStep(),
@@ -209,7 +225,8 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
                           ),
                           if (index < _totalSteps - 1)
                             Container(
-                              width: 40, // Fixed width for connectors
+                              width:
+                                  30, // Reduced width for connectors to fit 5 steps
                               height: 2,
                               color: index < _currentStep
                                   ? AppColors.primaryGold
@@ -242,10 +259,12 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
       case 0:
         return 'Personal Information';
       case 1:
-        return 'Document Verification';
+        return 'Email Verification';
       case 2:
-        return 'Identity Verification';
+        return 'Document Verification';
       case 3:
+        return 'Identity Verification';
+      case 4:
         return 'Review & Submit';
       default:
         return '';
@@ -571,17 +590,8 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
     });
 
     try {
-      final authService = AuthService();
-      final dateOfBirthISO = _formatDateOfBirth(_dobController.text);
-
-      final response = await authService.register(
-        first_name: _firstNameController.text.trim(),
-        last_name: _lastNameController.text.trim(),
-        email: _emailController.text.trim(),
-        phone: _phoneController.text.trim(),
-        date_of_birth: dateOfBirthISO,
-        password: _passwordController.text,
-      );
+      final email = _emailController.text.trim();
+      final success = await AuthService().sendOtp(email);
 
       if (!mounted) return;
 
@@ -589,121 +599,188 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
         _isStepOneSubmitting = false;
       });
 
-      if (response.success) {
-        if (response.token != null) {
-          await authService.saveToken(response.token!);
-        }
-        if (response.user != null) {
-          await authService.saveUserData(response.user!);
-        } else if (response.data != null &&
-            response.data!['user'] != null &&
-            response.data!['user'] is Map<String, dynamic>) {
-          await authService
-              .saveUserData(response.data!['user'] as Map<String, dynamic>);
-        }
-
+      if (success) {
+        // Show success message and proceed to next step
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(response.message ??
-                'Account created. Continue with verification steps.'),
-            backgroundColor: AppColors.primaryGold,
+          const SnackBar(
+            content: Text('OTP sent successfully. Please check your email.'),
+            backgroundColor: AppColors.successGreen,
           ),
         );
-
         _nextStep();
       } else {
-        // Handle field-specific validation errors
-        print(
-            '🔴 Registration failed. Response fieldErrors: ${response.fieldErrors}');
-        if (response.fieldErrors != null && response.fieldErrors!.isNotEmpty) {
-          // Map API field errors to our field error variables
-          // Handle various possible field name formats
-          Map<String, String> fieldErrorMap = {};
-          response.fieldErrors!.forEach((field, error) {
-            print('  📍 Mapping field error: "$field" -> "$error"');
-            switch (field.toLowerCase()) {
-              case 'firstname':
-              case 'first_name':
-                fieldErrorMap['firstName'] = error;
-                break;
-              case 'lastname':
-              case 'last_name':
-                fieldErrorMap['lastName'] = error;
-                break;
-              case 'email':
-                fieldErrorMap['email'] = error;
-                break;
-              case 'phone':
-              case 'phonenumber':
-              case 'phone_number':
-                fieldErrorMap['phone'] = error;
-                break;
-              case 'password':
-                fieldErrorMap['password'] = error;
-                break;
-              case 'dateofbirth':
-              case 'date_of_birth':
-              case 'dob':
-                fieldErrorMap['dob'] = error;
-                break;
-            }
-          });
-
-          print('✅ Mapped field errors: $fieldErrorMap');
-
-          // Set all error state variables in one setState call
-          setState(() {
-            _firstNameError = fieldErrorMap['firstName'];
-            _lastNameError = fieldErrorMap['lastName'];
-            _emailError = fieldErrorMap['email'];
-            _phoneError = fieldErrorMap['phone'];
-            _passwordError = fieldErrorMap['password'];
-            _dobError = fieldErrorMap['dob'];
-          });
-
-          print(
-              '✅ Set state errors - firstName: $_firstNameError, email: $_emailError, phone: $_phoneError');
-
-          // Trigger form validation to show the errors
-          // Use a small delay to ensure state is updated before validation
-          Future.delayed(const Duration(milliseconds: 300), () {
-            if (mounted) {
-              // Force validation on all fields to display the errors
-              _personalFormKey.currentState?.validate();
-            }
-          });
-
-          // Show snackbar message along with field-specific errors
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(response.message ??
-                  'Validation failed. Please check the fields below.'),
-              backgroundColor: AppColors.errorRed,
-              duration: const Duration(seconds: 4),
-            ),
-          );
-        } else {
-          // Show generic error message if no field-specific errors were provided
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(response.message ??
-                  'Registration failed. Please check your information and try again.'),
-              backgroundColor: AppColors.errorRed,
-              duration: const Duration(seconds: 4),
-            ),
-          );
-        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to send OTP. Please try again.'),
+            backgroundColor: AppColors.errorRed,
+          ),
+        );
       }
     } catch (e) {
       if (!mounted) return;
-
       setState(() {
         _isStepOneSubmitting = false;
       });
-
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('An unexpected error occurred: ${e.toString()}'),
+          content: Text('An error occurred: $e'),
+          backgroundColor: AppColors.errorRed,
+        ),
+      );
+    }
+  }
+
+  Widget _buildOtpVerificationStep() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const OuroPayIcon(size: 48),
+          const SizedBox(height: 24),
+
+          const Text(
+            'Check your email',
+            style: TextStyle(
+              fontSize: 28,
+              fontWeight: FontWeight.bold,
+              color: AppColors.whiteText,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'We sent a verification code to ${_emailController.text}',
+            style: const TextStyle(
+              fontSize: 16,
+              color: AppColors.greyText,
+            ),
+          ),
+          const SizedBox(height: 32),
+
+          // OTP Input
+          _buildTextField(
+            controller: _otpController,
+            label: 'Verification Code',
+            icon: Icons.lock_clock_outlined,
+            keyboardType: TextInputType.number,
+            onChanged: () {
+              // Auto-submit if 6 digits? Optional.
+            },
+            validator: (value) {
+              if (value == null || value.isEmpty) {
+                return 'Please enter the code';
+              }
+              if (value.length < 4) {
+                return 'Code must be at least 4 digits';
+              }
+              return null;
+            },
+          ),
+          const SizedBox(height: 32),
+
+          // Verify Button
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _isOtpSubmitting ? null : _handleOtpVerification,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryGold,
+                foregroundColor: AppColors.darkBackground,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: _isOtpSubmitting
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        color: AppColors.darkBackground,
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : const Text(
+                      'Verify Email',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Center(
+            child: TextButton(
+              onPressed: _isOtpSubmitting
+                  ? null
+                  : () async {
+                      // Resend OTP logic
+                      await _handleStepOneContinue();
+                    },
+              child: const Text(
+                'Resend Code',
+                style: TextStyle(color: AppColors.primaryGold),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _handleOtpVerification() async {
+    if (_isOtpSubmitting) return;
+
+    final otp = _otpController.text.trim();
+    if (otp.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter the verification code'),
+          backgroundColor: AppColors.errorRed,
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _isOtpSubmitting = true;
+    });
+
+    try {
+      final email = _emailController.text.trim();
+      final success = await AuthService().verifyOtp(email, otp);
+
+      if (!mounted) return;
+
+      setState(() {
+        _isOtpSubmitting = false;
+      });
+
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Email verified successfully!'),
+            backgroundColor: AppColors.successGreen,
+          ),
+        );
+        _nextStep();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Invalid verification code. Please try again.'),
+            backgroundColor: AppColors.errorRed,
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isOtpSubmitting = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('An error occurred: $e'),
           backgroundColor: AppColors.errorRed,
         ),
       );
@@ -826,7 +903,7 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
                 const SizedBox(height: 16),
                 Text(
                   _documentsUploaded
-                      ? 'Documents uploaded successfully!'
+                      ? 'Document uploaded successfully!'
                       : 'Upload $_selectedDocumentType',
                   style: TextStyle(
                     fontSize: 18,
@@ -835,18 +912,50 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
                         ? AppColors.successGreen
                         : AppColors.whiteText,
                   ),
+                  textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 8),
-                Text(
-                  _documentsUploaded
-                      ? 'Front and back sides captured'
-                      : 'We\'ll guide you through taking photos of both sides',
-                  style: const TextStyle(
+                const Text(
+                  'Select PDF, JPG, PNG or take a photo',
+                  style: TextStyle(
                     fontSize: 14,
                     color: AppColors.greyText,
                   ),
                   textAlign: TextAlign.center,
                 ),
+
+                // Show uploaded file
+                if (_documentFile != null) ...[
+                  const SizedBox(height: 24),
+                  const Divider(color: AppColors.greyText),
+                  const SizedBox(height: 16),
+
+                  // Document preview
+                  _buildDocumentPreview(
+                    'Document',
+                    _documentPath!,
+                    _documentFile!,
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Reset button
+                  TextButton.icon(
+                    onPressed: () {
+                      setState(() {
+                        _documentFile = null;
+                        _documentPath = null;
+                        _documentsUploaded = false;
+                      });
+                    },
+                    icon: const Icon(Icons.refresh, color: AppColors.errorRed),
+                    label: const Text(
+                      'Reset and Upload Again',
+                      style: TextStyle(color: AppColors.errorRed),
+                    ),
+                  ),
+                ],
+
                 const SizedBox(height: 16),
                 if (!_documentsUploaded)
                   ElevatedButton.icon(
@@ -859,8 +968,8 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
                         vertical: 12,
                       ),
                     ),
-                    icon: const Icon(Icons.camera_alt),
-                    label: const Text('Start Capture'),
+                    icon: const Icon(Icons.upload_file),
+                    label: const Text('Upload Document'),
                   ),
               ],
             ),
@@ -1377,66 +1486,516 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
     }
   }
 
-  void _startDocumentCapture() {
-    // Simulate document capture process
-    // In real app, this would integrate with Sumsub/Veriff SDK
-    showDialog(
+  Future<void> _startDocumentCapture() async {
+    // Show options for document upload
+    showModalBottomSheet(
       context: context,
+      backgroundColor: AppColors.cardBackground,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Upload Document',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: AppColors.whiteText,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Upload your $_selectedDocumentType',
+              style: const TextStyle(
+                fontSize: 14,
+                color: AppColors.greyText,
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // Take Photo option
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryGold.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.camera_alt,
+                  color: AppColors.primaryGold,
+                ),
+              ),
+              title: const Text(
+                'Take Photo',
+                style: TextStyle(
+                  color: AppColors.whiteText,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              subtitle: const Text(
+                'Use your camera to capture document',
+                style: TextStyle(color: AppColors.greyText, fontSize: 12),
+              ),
+              onTap: () {
+                Navigator.pop(context);
+                _pickImageFromCamera();
+              },
+            ),
+            const SizedBox(height: 8),
+
+            // Choose from Gallery option
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryGold.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.photo_library,
+                  color: AppColors.primaryGold,
+                ),
+              ),
+              title: const Text(
+                'Choose from Gallery',
+                style: TextStyle(
+                  color: AppColors.whiteText,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              subtitle: const Text(
+                'Select JPG or PNG image',
+                style: TextStyle(color: AppColors.greyText, fontSize: 12),
+              ),
+              onTap: () {
+                Navigator.pop(context);
+                _pickImageFromGallery();
+              },
+            ),
+            const SizedBox(height: 8),
+
+            // Select PDF option
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryGold.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.picture_as_pdf,
+                  color: AppColors.primaryGold,
+                ),
+              ),
+              title: const Text(
+                'Select PDF File',
+                style: TextStyle(
+                  color: AppColors.whiteText,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              subtitle: const Text(
+                'Choose PDF document',
+                style: TextStyle(color: AppColors.greyText, fontSize: 12),
+              ),
+              onTap: () {
+                Navigator.pop(context);
+                _pickPdfFile();
+              },
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickImageFromCamera() async {
+    try {
+      final XFile? image = await _imagePicker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 85,
+        maxWidth: 1920,
+        maxHeight: 1920,
+      );
+
+      if (image != null) {
+        final file = File(image.path);
+        final fileSize = await file.length();
+
+        // Check file size (max 10MB)
+        if (fileSize > 10 * 1024 * 1024) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('File size must be less than 10MB'),
+              backgroundColor: AppColors.errorRed,
+            ),
+          );
+          return;
+        }
+
+        setState(() {
+          _documentFile = file;
+          _documentPath = image.path;
+          _documentsUploaded = true;
+        });
+
+        if (!mounted) return;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Document captured successfully!'),
+            backgroundColor: AppColors.successGreen,
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error capturing image: ${e.toString()}'),
+          backgroundColor: AppColors.errorRed,
+        ),
+      );
+    }
+  }
+
+  Future<void> _pickImageFromGallery() async {
+    try {
+      final XFile? image = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 85,
+        maxWidth: 1920,
+        maxHeight: 1920,
+      );
+
+      if (image != null) {
+        final file = File(image.path);
+        final fileSize = await file.length();
+
+        // Check file size (max 10MB)
+        if (fileSize > 10 * 1024 * 1024) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('File size must be less than 10MB'),
+              backgroundColor: AppColors.errorRed,
+            ),
+          );
+          return;
+        }
+
+        setState(() {
+          _documentFile = file;
+          _documentPath = image.path;
+          _documentsUploaded = true;
+        });
+
+        if (!mounted) return;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Document selected successfully!'),
+            backgroundColor: AppColors.successGreen,
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error selecting image: ${e.toString()}'),
+          backgroundColor: AppColors.errorRed,
+        ),
+      );
+    }
+  }
+
+  Future<void> _pickPdfFile() async {
+    try {
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf'],
+      );
+
+      if (result != null && result.files.single.path != null) {
+        final file = File(result.files.single.path!);
+        final fileSize = await file.length();
+
+        // Check file size (max 10MB)
+        if (fileSize > 10 * 1024 * 1024) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('File size must be less than 10MB'),
+              backgroundColor: AppColors.errorRed,
+            ),
+          );
+          return;
+        }
+
+        setState(() {
+          _documentFile = file;
+          _documentPath = result.files.single.path;
+          _documentsUploaded = true;
+        });
+
+        if (!mounted) return;
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Document uploaded successfully!'),
+            backgroundColor: AppColors.successGreen,
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error selecting PDF: ${e.toString()}'),
+          backgroundColor: AppColors.errorRed,
+        ),
+      );
+    }
+  }
+
+  Future<void> _startSelfieCapture() async {
+    // 1. Show instructions dialog
+    final bool? proceed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
       builder: (context) => AlertDialog(
         backgroundColor: AppColors.cardBackground,
         title: const Text(
-          'Document Capture',
+          'Selfie Verification',
           style: TextStyle(color: AppColors.whiteText),
         ),
-        content: const Text(
-          'In a real implementation, this would launch the Sumsub or Veriff SDK for document capture.',
-          style: TextStyle(color: AppColors.greyText),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: const [
+            Text(
+              'To verify your identity, please take a clear selfie.',
+              style: TextStyle(color: AppColors.whiteText),
+            ),
+            SizedBox(height: 16),
+            Text(
+              '• Remove glasses, hats, or masks',
+              style: TextStyle(color: AppColors.greyText),
+            ),
+            Text(
+              '• Ensure your face is fully visible',
+              style: TextStyle(color: AppColors.greyText),
+            ),
+            Text(
+              '• Look straight at the camera',
+              style: TextStyle(color: AppColors.greyText),
+            ),
+            Text(
+              '• Ensure good lighting',
+              style: TextStyle(color: AppColors.greyText),
+            ),
+          ],
         ),
         actions: [
           TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              setState(() {
-                _documentsUploaded = true;
-              });
-            },
+            onPressed: () => Navigator.pop(context, false),
             child: const Text(
-              'Simulate Success',
+              'Cancel',
+              style: TextStyle(color: AppColors.greyText),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text(
+              'I\'m Ready',
               style: TextStyle(color: AppColors.primaryGold),
             ),
           ),
         ],
       ),
     );
+
+    if (proceed != true) return;
+
+    try {
+      // 2. Capture image from front camera
+      final XFile? image = await _imagePicker.pickImage(
+        source: ImageSource.camera,
+        preferredCameraDevice: CameraDevice.front,
+        imageQuality: 85,
+        maxWidth: 1920,
+        maxHeight: 1920,
+      );
+
+      if (image == null) return;
+
+      // 3. Process image for face detection
+      final inputImage = InputImage.fromFilePath(image.path);
+      final options = FaceDetectorOptions(
+        enableClassification: true, // For eyes open/smile
+        enableLandmarks: true, // For detailed positioning if needed
+        performanceMode: FaceDetectorMode.accurate,
+      );
+      final faceDetector = FaceDetector(options: options);
+      final List<Face> faces = await faceDetector.processImage(inputImage);
+      await faceDetector.close();
+
+      if (!mounted) return;
+
+      // 4. Validate face
+      if (faces.isEmpty) {
+        _showError(
+            'No face detected. Please ensure your face is clearly visible.');
+        return;
+      }
+
+      if (faces.length > 1) {
+        _showError(
+            'Multiple faces detected. Please ensure only you are in the frame.');
+        return;
+      }
+
+      final Face face = faces.first;
+
+      // Check head rotation (looking straight)
+      // Euler X: Up/Down (should be close to 0)
+      // Euler Y: Left/Right (should be close to 0)
+      final double? rotX = face.headEulerAngleX;
+      final double? rotY = face.headEulerAngleY;
+
+      if (rotX != null && (rotX < -15 || rotX > 15)) {
+        _showError('Please look straight at the camera (head tilted up/down).');
+        return;
+      }
+
+      if (rotY != null && (rotY < -15 || rotY > 15)) {
+        _showError(
+            'Please look straight at the camera (head turned left/right).');
+        return;
+      }
+
+      // Check eyes open probability (detect blinking or sunglasses)
+      // Note: Probability is null if classification is not enabled or detection failed
+      final double? leftEyeOpen = face.leftEyeOpenProbability;
+      final double? rightEyeOpen = face.rightEyeOpenProbability;
+
+      if (leftEyeOpen != null && rightEyeOpen != null) {
+        if (leftEyeOpen < 0.5 || rightEyeOpen < 0.5) {
+          _showError(
+              'Eyes not clearly visible. Please remove sunglasses and don\'t blink.');
+          return;
+        }
+      }
+
+      // 5. Success
+      setState(() {
+        _selfieCompleted = true;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Selfie verified successfully!'),
+          backgroundColor: AppColors.successGreen,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      _showError('Error processing selfie: ${e.toString()}');
+    }
   }
 
-  void _startSelfieCapture() {
-    // Simulate selfie capture process
-    // In real app, this would integrate with Sumsub/Veriff SDK
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppColors.cardBackground,
-        title: const Text(
-          'Selfie Capture',
-          style: TextStyle(color: AppColors.whiteText),
-        ),
-        content: const Text(
-          'In a real implementation, this would launch the Sumsub or Veriff SDK for selfie capture and liveness detection.',
-          style: TextStyle(color: AppColors.greyText),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              setState(() {
-                _selfieCompleted = true;
-              });
-            },
-            child: const Text(
-              'Simulate Success',
-              style: TextStyle(color: AppColors.primaryGold),
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: AppColors.errorRed,
+        duration: const Duration(seconds: 4),
+      ),
+    );
+  }
+
+  Widget _buildDocumentPreview(String label, String path, File file) {
+    final isPdf = path.toLowerCase().endsWith('.pdf');
+    final fileName = path.split('/').last;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.darkBackground,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.primaryGold.withOpacity(0.3)),
+      ),
+      child: Row(
+        children: [
+          // Preview or icon
+          Container(
+            width: 60,
+            height: 60,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(8),
+              color: AppColors.cardBackground,
             ),
+            child: isPdf
+                ? const Icon(
+                    Icons.picture_as_pdf,
+                    color: AppColors.errorRed,
+                    size: 32,
+                  )
+                : ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.file(
+                      file,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return const Icon(
+                          Icons.image,
+                          color: AppColors.greyText,
+                          size: 32,
+                        );
+                      },
+                    ),
+                  ),
+          ),
+          const SizedBox(width: 12),
+          // File info
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    color: AppColors.whiteText,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  fileName,
+                  style: const TextStyle(
+                    color: AppColors.greyText,
+                    fontSize: 12,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          const Icon(
+            Icons.check_circle,
+            color: AppColors.successGreen,
+            size: 24,
           ),
         ],
       ),

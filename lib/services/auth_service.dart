@@ -416,4 +416,148 @@ class AuthService {
       return false;
     }
   }
+
+  /// Send OTP for email verification
+  ///
+  /// Makes a POST request to {{base_url}}/email-verification/send-otp
+  /// Expected request body: { "email": "..." }
+  Future<bool> sendOtp(String email) async {
+    try {
+      final url = Uri.parse('$_baseUrl/email-verification/send-otp');
+
+      print('');
+      print('═══════════════════════════════════════════════════════════');
+      print('🔵 SEND OTP API CALL');
+      print('═══════════════════════════════════════════════════════════');
+      print('📍 API Endpoint: $url');
+      print('📤 Request Body: ${jsonEncode({'email': email})}');
+      print(
+          '📋 Headers: Content-Type: application/json, Accept: application/json');
+      print('───────────────────────────────────────────────────────────');
+
+      final response = await http
+          .post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: jsonEncode({'email': email}),
+      )
+          .timeout(
+        AppConfig.connectionTimeout,
+        onTimeout: () {
+          throw Exception(
+              'Connection timeout. Please check your internet connection.');
+        },
+      );
+
+      print('📥 Response Status Code: ${response.statusCode}');
+      print('📥 Response Body: ${response.body}');
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final responseData = jsonDecode(response.body);
+        final message = responseData['message'] ?? 'OTP sent successfully';
+        final success = responseData['success'] ?? true;
+
+        print('✅ Success: $success');
+        print('💬 Message: $message');
+        print('📊 Full Response Data: $responseData');
+        print('═══════════════════════════════════════════════════════════');
+        print('');
+
+        return success;
+      } else {
+        final responseData = jsonDecode(response.body);
+        final message = responseData['message'] ??
+            responseData['error'] ??
+            'Failed to send OTP';
+
+        print('❌ Failed: Status ${response.statusCode}');
+        print('💬 Error Message: $message');
+        print('📊 Full Response Data: $responseData');
+        print('═══════════════════════════════════════════════════════════');
+        print('');
+
+        return false;
+      }
+    } catch (e) {
+      print('❌ Send OTP Error: $e');
+      print('═══════════════════════════════════════════════════════════');
+      print('');
+      return false;
+    }
+  }
+
+  /// Verify OTP for email verification
+  ///
+  /// Makes a POST request to {{base_url}}/email-verification/verify-otp
+  /// Expected request body: { "email": "...", "otp": "..." }
+  Future<bool> verifyOtp(String email, String otp) async {
+    try {
+      final url = Uri.parse('$_baseUrl/email-verification/verify-otp');
+
+      print('');
+      print('═══════════════════════════════════════════════════════════');
+      print('🔵 VERIFY OTP API CALL');
+      print('═══════════════════════════════════════════════════════════');
+      print('📍 API Endpoint: $url');
+      print('📤 Request Body: ${jsonEncode({'email': email, 'otp': otp})}');
+      print(
+          '📋 Headers: Content-Type: application/json, Accept: application/json');
+      print('───────────────────────────────────────────────────────────');
+
+      final response = await http
+          .post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: jsonEncode({'email': email, 'otp': otp}),
+      )
+          .timeout(
+        AppConfig.connectionTimeout,
+        onTimeout: () {
+          throw Exception(
+              'Connection timeout. Please check your internet connection.');
+        },
+      );
+
+      print('📥 Response Status Code: ${response.statusCode}');
+      print('📥 Response Body: ${response.body}');
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final responseData = jsonDecode(response.body);
+        final message = responseData['message'] ?? 'OTP verified successfully';
+        final success = responseData['success'] ?? true;
+
+        print('✅ Success: $success');
+        print('💬 Message: $message');
+        print('📊 Full Response Data: $responseData');
+        print('═══════════════════════════════════════════════════════════');
+        print('');
+
+        return success;
+      } else {
+        final responseData = jsonDecode(response.body);
+        final message = responseData['message'] ??
+            responseData['error'] ??
+            'Failed to verify OTP';
+
+        print('❌ Failed: Status ${response.statusCode}');
+        print('💬 Error Message: $message');
+        print('📊 Full Response Data: $responseData');
+        print('═══════════════════════════════════════════════════════════');
+        print('');
+
+        return false;
+      }
+    } catch (e) {
+      print('❌ Verify OTP Error: $e');
+      print('═══════════════════════════════════════════════════════════');
+      print('');
+      return false;
+    }
+  }
 }
