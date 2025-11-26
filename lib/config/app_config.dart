@@ -1,3 +1,5 @@
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+
 enum Environment {
   development,
   production,
@@ -13,6 +15,12 @@ class AppConfig {
   }
 
   static String get appName {
+    // Try to get from env, fallback to default
+    final envName = dotenv.env['APP_NAME'];
+    if (envName != null && envName.isNotEmpty) {
+      return envName;
+    }
+
     switch (_environment) {
       case Environment.development:
         return 'Ouro Pay Dev';
@@ -22,15 +30,28 @@ class AppConfig {
   }
 
   static String get baseUrl {
+    // Get from environment variable
+    final envBaseUrl = dotenv.env['BASE_URL'];
+    if (envBaseUrl != null && envBaseUrl.isNotEmpty) {
+      return envBaseUrl;
+    }
+
+    // Fallback to default if env not loaded
     switch (_environment) {
       case Environment.development:
-        return 'https://api-dev.ouropay.com';
+        return 'http://64.225.108.213/api/v1';
       case Environment.production:
-        return 'https://api.ouropay.com';
+        return 'http://64.225.108.213/api/v1';
     }
   }
 
   static String get apiVersion {
+    // Try to get from env, fallback to default
+    final envVersion = dotenv.env['API_VERSION'];
+    if (envVersion != null && envVersion.isNotEmpty) {
+      return envVersion;
+    }
+
     switch (_environment) {
       case Environment.development:
         return 'v1';
@@ -49,6 +70,12 @@ class AppConfig {
   }
 
   static String get bundleId {
+    // Try to get from env, fallback to default
+    final envBundleId = dotenv.env['BUNDLE_ID'];
+    if (envBundleId != null && envBundleId.isNotEmpty) {
+      return envBundleId;
+    }
+
     switch (_environment) {
       case Environment.development:
         return 'com.ouropay.consumer.dev';
@@ -58,6 +85,15 @@ class AppConfig {
   }
 
   static Duration get connectionTimeout {
+    // Try to get from env, fallback to default
+    final envTimeout = dotenv.env['CONNECTION_TIMEOUT'];
+    if (envTimeout != null && envTimeout.isNotEmpty) {
+      final timeoutSeconds = int.tryParse(envTimeout);
+      if (timeoutSeconds != null) {
+        return Duration(seconds: timeoutSeconds);
+      }
+    }
+
     switch (_environment) {
       case Environment.development:
         return const Duration(seconds: 30);
@@ -67,6 +103,15 @@ class AppConfig {
   }
 
   static int get maxRetries {
+    // Try to get from env, fallback to default
+    final envRetries = dotenv.env['MAX_RETRIES'];
+    if (envRetries != null && envRetries.isNotEmpty) {
+      final retries = int.tryParse(envRetries);
+      if (retries != null) {
+        return retries;
+      }
+    }
+
     switch (_environment) {
       case Environment.development:
         return 3;

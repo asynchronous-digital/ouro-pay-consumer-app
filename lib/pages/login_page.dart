@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:ouro_pay_consumer_app/theme/app_theme.dart';
 import 'package:ouro_pay_consumer_app/widgets/logo.dart';
+import 'package:ouro_pay_consumer_app/services/auth_service.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -404,16 +405,97 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
         _isLoading = true;
       });
 
-      // Simulate login process
-      await Future.delayed(const Duration(seconds: 2));
+      try {
+        final authService = AuthService();
+        final response = await authService.login(
+          email: _emailController.text.trim(),
+          password: _passwordController.text,
+        );
 
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
 
-        // Navigate to dashboard
-        Navigator.pushReplacementNamed(context, '/dashboard');
+          if (response.success) {
+            print('🟢 ========== LOGIN SUCCESS ==========');
+            print('📦 Full Response Data: ${response.data}');
+            print('🔑 Token: ${response.token}');
+            print('👤 User from response.user: ${response.user}');
+            print(
+                '👤 User from response.data[\'user\']: ${response.data?['user']}');
+
+            // Save token if available
+            if (response.token != null) {
+              await authService.saveToken(response.token!);
+              print('✅ Token saved to SharedPreferences: ${response.token}');
+            } else {
+              print('⚠️ No token found in response');
+            }
+
+            // Save user data if available
+            Map<String, dynamic>? userDataToSave;
+            if (response.user != null) {
+              userDataToSave = response.user!;
+              await authService.saveUserData(response.user!);
+              print('✅ User data saved from response.user');
+            } else if (response.data != null &&
+                response.data!['user'] != null) {
+              userDataToSave = response.data!['user'] as Map<String, dynamic>;
+              await authService.saveUserData(userDataToSave);
+              print('✅ User data saved from response.data[\'user\']');
+            } else {
+              print('⚠️ No user data found in response');
+            }
+
+            if (userDataToSave != null) {
+              print('💾 User Data Saved to SharedPreferences:');
+              print('   - Raw JSON: $userDataToSave');
+              userDataToSave.forEach((key, value) {
+                print('   - $key: $value');
+              });
+            }
+            print('🟢 ====================================');
+
+            // Show success message
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(response.message ?? 'Login successful!'),
+                backgroundColor: AppColors.primaryGold,
+              ),
+            );
+
+            // Navigate to dashboard
+            Navigator.pushReplacementNamed(context, '/dashboard');
+          } else {
+            print('🔴 ========== LOGIN FAILED ==========');
+            print('❌ Message: ${response.message}');
+            print('📦 Full Response Data: ${response.data}');
+            print('🔴 ====================================');
+
+            // Show error message
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content:
+                    Text(response.message ?? 'Login failed. Please try again.'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        }
+      } catch (e) {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('An unexpected error occurred: ${e.toString()}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     }
   }
@@ -429,8 +511,7 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
   }
 
   void _navigateToSignUp() {
-    // Navigate to sign up page
-    _showComingSoon();
+    Navigator.of(context).pushNamed('/signup');
   }
 
   void _showForgotPassword() {
