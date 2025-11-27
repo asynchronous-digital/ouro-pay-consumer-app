@@ -29,18 +29,18 @@ class Deposit {
 
   factory Deposit.fromJson(Map<String, dynamic> json) {
     return Deposit(
-      id: json['id'],
-      reference: json['reference'],
-      currencyCode: json['currency_code'],
-      amount: (json['amount'] as num).toDouble(),
-      fee: (json['fee'] as num).toDouble(),
-      netAmount: (json['net_amount'] as num).toDouble(),
-      paymentMethod: json['payment_method'],
-      status: json['status'],
-      notes: json['notes'],
-      processedAt: json['processed_at'],
-      createdAt: json['created_at'],
-      updatedAt: json['updated_at'],
+      id: json['id'] as int,
+      reference: json['reference'] as String,
+      currencyCode: json['currency_code'] as String,
+      amount: (json['amount'] as num?)?.toDouble() ?? 0.0,
+      fee: (json['fee'] as num?)?.toDouble() ?? 0.0,
+      netAmount: (json['net_amount'] as num?)?.toDouble() ?? 0.0,
+      paymentMethod: json['payment_method'] as String,
+      status: json['status'] as String,
+      notes: json['notes'] as String?,
+      processedAt: json['processed_at'] as String?,
+      createdAt: json['created_at'] as String,
+      updatedAt: json['updated_at'] as String,
     );
   }
 

@@ -510,8 +510,36 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
     _showComingSoon();
   }
 
-  void _navigateToSignUp() {
-    Navigator.of(context).pushNamed('/signup');
+  Future<void> _navigateToSignUp() async {
+    final result = await Navigator.of(context).pushNamed('/signup');
+    if (result == true) {
+      if (!mounted) return;
+      final height = MediaQuery.of(context).size.height;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.check_circle, color: AppColors.successGreen),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'Registration is successful. Please use your credentials to sign in.',
+                  style: TextStyle(color: AppColors.whiteText),
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: AppColors.cardBackground,
+          duration: const Duration(seconds: 5),
+          behavior: SnackBarBehavior.floating,
+          margin: EdgeInsets.only(bottom: height - 140, left: 16, right: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: const BorderSide(color: AppColors.successGreen, width: 2),
+          ),
+        ),
+      );
+    }
   }
 
   void _showForgotPassword() {

@@ -7,18 +7,40 @@ class DepositResponse {
   final bool success;
   final String message;
   final Deposit? data;
+  final String? clientSecret;
 
   DepositResponse({
     required this.success,
     required this.message,
     this.data,
+    this.clientSecret,
   });
 
   factory DepositResponse.fromJson(Map<String, dynamic> json) {
+    // Backend returns client_secret at data.client_secret
+    String? secret;
+    Deposit? deposit;
+
+    if (json['data'] != null) {
+      // Get client_secret from data level
+      if (json['data']['client_secret'] != null) {
+        secret = json['data']['client_secret'];
+      }
+
+      // Get deposit from data.deposit
+      if (json['data']['deposit'] != null) {
+        deposit = Deposit.fromJson(json['data']['deposit']);
+      } else if (json['data']['id'] != null) {
+        // Fallback: if deposit data is directly in data object
+        deposit = Deposit.fromJson(json['data']);
+      }
+    }
+
     return DepositResponse(
       success: json['success'] ?? false,
       message: json['message'] ?? '',
-      data: json['data'] != null ? Deposit.fromJson(json['data']) : null,
+      data: deposit,
+      clientSecret: secret,
     );
   }
 }

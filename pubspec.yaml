@@ -51,6 +51,22 @@ dependencies:
   
   # Date formatting
   intl: ^0.19.0
+  
+  # File and image picking
+  image_picker: ^0.8.9
+  file_picker: ^10.3.7
+  path_provider: ^2.1.2
+  google_mlkit_face_detection: ^0.11.0
+  
+  # PIN input field
+  pinput: ^5.0.0
+  
+  # Country code picker for phone numbers
+  country_code_picker: ^3.0.0
+  flutter_stripe: ^12.1.1
+  
+  # Toast messages for notifications
+  fluttertoast: ^8.2.4
 
 dev_dependencies:
   flutter_test:
@@ -76,7 +92,7 @@ flutter:
 
   # To add assets to your application, add an assets section, like this:
   assets:
-    - assets/images/
+    # - assets/images/
     - .env.development
     - .env.production
 

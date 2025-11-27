@@ -119,4 +119,9 @@ class AppConfig {
         return 2;
     }
   }
+
+  static String get stripePublishableKey {
+    final envKey = dotenv.env['STRIPE_PUBLISHABLE_KEY'];
+    return envKey ?? '';
+  }
 }

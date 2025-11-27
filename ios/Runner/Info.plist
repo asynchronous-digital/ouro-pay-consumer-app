@@ -45,5 +45,12 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	<!-- Permissions for camera and photo library access -->
+	<key>NSCameraUsageDescription</key>
+	<string>We need access to your camera to capture photos of your identity documents for verification.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>We need access to your photo library to select images of your identity documents for verification.</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>We need permission to save photos to your photo library.</string>
 </dict>
 </plist>

@@ -3,6 +3,8 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ouro_pay_consumer_app/config/app_config.dart';
 import 'package:ouro_pay_consumer_app/models/user.dart';
+import 'package:ouro_pay_consumer_app/models/country.dart';
+import 'package:ouro_pay_consumer_app/models/user_profile.dart';
 
 /// Response model for login
 class LoginResponse {
@@ -38,7 +40,7 @@ class RegisterResponse {
   final Map<String, dynamic>? user;
   final String? message;
   final Map<String, dynamic>? data;
-  final Map<String, String>? fieldErrors; // Field-specific validation errors
+  final Map<String, List<String>>? errors; // Field-specific validation errors
 
   RegisterResponse({
     required this.success,
@@ -46,38 +48,38 @@ class RegisterResponse {
     this.user,
     this.message,
     this.data,
-    this.fieldErrors,
+    this.errors,
   });
 
   factory RegisterResponse.fromJson(Map<String, dynamic> json) {
     // Parse field-specific errors from various possible formats
-    Map<String, String>? fieldErrors;
+    Map<String, List<String>>? errors;
 
     if (json['errors'] != null) {
       if (json['errors'] is Map) {
-        fieldErrors = {};
+        errors = {};
         (json['errors'] as Map).forEach((key, value) {
           if (value is String) {
-            fieldErrors![key.toString()] = value;
-          } else if (value is List && value.isNotEmpty) {
-            fieldErrors![key.toString()] = value[0].toString();
+            errors![key.toString()] = [value];
+          } else if (value is List) {
+            errors![key.toString()] = value.map((e) => e.toString()).toList();
           }
         });
       }
     } else if (json['validation'] != null && json['validation'] is Map) {
-      fieldErrors = {};
+      errors = {};
       (json['validation'] as Map).forEach((key, value) {
         if (value is String) {
-          fieldErrors![key.toString()] = value;
-        } else if (value is List && value.isNotEmpty) {
-          fieldErrors![key.toString()] = value[0].toString();
+          errors![key.toString()] = [value];
+        } else if (value is List) {
+          errors![key.toString()] = value.map((e) => e.toString()).toList();
         }
       });
     }
 
     // Print parsed field errors for debugging
-    if (fieldErrors != null && fieldErrors.isNotEmpty) {
-      print('🔴 Parsed Field Errors: $fieldErrors');
+    if (errors != null && errors.isNotEmpty) {
+      print('🔴 Parsed Field Errors: $errors');
     }
 
     return RegisterResponse(
@@ -86,7 +88,7 @@ class RegisterResponse {
       user: json['user'] ?? json['data']?['user'],
       message: json['message'] ?? json['error'],
       data: json['data'],
-      fieldErrors: fieldErrors,
+      errors: errors,
     );
   }
 }
@@ -223,6 +225,163 @@ class AuthService {
     }
   }
 
+  /// Register a new user with document uploads
+  ///
+  /// Makes a POST request to {{base_url}}/auth/register with multipart/form-data
+  /// Required fields:
+  /// - first_name, last_name, email, password, date_of_birth
+  /// - otp (verification code)
+  /// - country_id (ID of the country)
+  /// - document_type (passport, national_id, or drivers_license)
+  /// - document (file: JPG, PNG, WEBP, PDF - max 5MB)
+  /// - selfie (file: JPG, PNG, WEBP - max 5MB)
+  Future<RegisterResponse> registerWithDocuments({
+    required String firstName,
+    required String lastName,
+    required String email,
+    required String password,
+    required String dateOfBirth,
+    required String phone,
+    required String otp,
+    required int countryId,
+    required String documentType,
+    required String documentPath,
+    required String selfiePath,
+  }) async {
+    try {
+      final url = Uri.parse('$_baseUrl/auth/register');
+
+      print('');
+      print('═══════════════════════════════════════════════════════════');
+      print('🔵 REGISTER WITH DOCUMENTS API CALL');
+      print('═══════════════════════════════════════════════════════════');
+      print('📍 API Endpoint: $url');
+      print('───────────────────────────────────────────────────────────');
+
+      // Create multipart request
+      var request = http.MultipartRequest('POST', url);
+
+      // Add text fields
+      request.fields['first_name'] = firstName;
+      request.fields['last_name'] = lastName;
+      request.fields['email'] = email;
+      request.fields['password'] = password;
+      request.fields['password_confirmation'] = password; // Same as password
+      request.fields['date_of_birth'] = dateOfBirth;
+      request.fields['phone'] = phone;
+      request.fields['otp'] = otp;
+      request.fields['country_id'] = countryId.toString();
+      request.fields['document_type'] = documentType;
+
+      print('📤 Request Fields:');
+      print('   first_name: $firstName');
+      print('   last_name: $lastName');
+      print('   email: $email');
+      print('   phone: $phone');
+      print('   date_of_birth: $dateOfBirth');
+      print('   password: ***');
+      print('   password_confirmation: ***');
+      print('   otp: $otp');
+      print('   country_id: $countryId');
+      print('   document_type: $documentType');
+
+      // Add document file
+      var documentFile = await http.MultipartFile.fromPath(
+        'document',
+        documentPath,
+      );
+      request.files.add(documentFile);
+      print('   document: ${documentPath.split('/').last}');
+
+      // Add selfie file
+      var selfieFile = await http.MultipartFile.fromPath(
+        'selfie',
+        selfiePath,
+      );
+      request.files.add(selfieFile);
+      print('   selfie: ${selfiePath.split('/').last}');
+
+      // Set headers (no access token needed for registration)
+      request.headers['Accept'] = 'application/json';
+
+      print('───────────────────────────────────────────────────────────');
+
+      // Send request
+      final streamedResponse = await request.send().timeout(
+        const Duration(seconds: 60), // Longer timeout for file uploads
+        onTimeout: () {
+          throw Exception(
+              'Connection timeout. Please check your internet connection.');
+        },
+      );
+
+      // Get response
+      final response = await http.Response.fromStream(streamedResponse);
+
+      print('📥 Response Status Code: ${response.statusCode}');
+      print('📥 Response Body: ${response.body}');
+
+      // Handle empty response body
+      if (response.body.isEmpty) {
+        print('❌ Failed: Empty response from server');
+        print('═══════════════════════════════════════════════════════════');
+        print('');
+        return RegisterResponse(
+          success: false,
+          message: 'Empty response from server. Please try again.',
+        );
+      }
+
+      Map<String, dynamic> responseData;
+      try {
+        responseData = jsonDecode(response.body) as Map<String, dynamic>;
+      } catch (e) {
+        print('❌ Failed: Invalid JSON response');
+        print('═══════════════════════════════════════════════════════════');
+        print('');
+        return RegisterResponse(
+          success: false,
+          message: 'Invalid response format from server. Please try again.',
+        );
+      }
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        print('✅ Success: Registration completed');
+        print('═══════════════════════════════════════════════════════════');
+        print('');
+        return RegisterResponse.fromJson(responseData);
+      } else {
+        print('❌ Failed: Status ${response.statusCode}');
+        print('═══════════════════════════════════════════════════════════');
+        print('');
+        // Handle error response - still parse field errors even from error responses
+        return RegisterResponse.fromJson(responseData);
+      }
+    } catch (e) {
+      print('❌ Register Error: $e');
+      print('═══════════════════════════════════════════════════════════');
+      print('');
+
+      // Handle network errors, timeouts, etc.
+      String errorMessage = 'An error occurred. Please try again.';
+
+      if (e.toString().contains('timeout')) {
+        errorMessage =
+            'Connection timeout. Please check your internet connection.';
+      } else if (e.toString().contains('SocketException') ||
+          e.toString().contains('Failed host lookup')) {
+        errorMessage = 'No internet connection. Please check your network.';
+      } else if (e.toString().contains('FormatException')) {
+        errorMessage = 'Invalid response from server. Please try again.';
+      }
+
+      return RegisterResponse(
+        success: false,
+        message: errorMessage,
+      );
+    }
+  }
+
   /// Login with email and password
   ///
   /// Makes a POST request to {{base_url}}/auth/login
@@ -322,12 +481,17 @@ class AuthService {
   /// Get stored authentication token
   Future<String?> getToken() async {
     final prefs = await _prefs;
-    return prefs.getString(_tokenKey);
+    final token = prefs.getString(_tokenKey);
+    if (token != null) {
+      print('🔑 Retrieved Token: $token');
+    }
+    return token;
   }
 
   /// Save authentication token
   Future<void> saveToken(String token) async {
     final prefs = await _prefs;
+    print('🔑 Saving Token: $token');
     await prefs.setString(_tokenKey, token);
   }
 
@@ -414,6 +578,295 @@ class AuthService {
       // Even if there's an error, try to clear local data
       await clearToken();
       return false;
+    }
+  }
+
+  /// Send OTP for email verification
+  ///
+  /// Makes a POST request to {{base_url}}/email-verification/send-otp
+  /// Expected request body: { "email": "..." }
+  Future<bool> sendOtp(String email) async {
+    try {
+      final url = Uri.parse('$_baseUrl/email-verification/send-otp');
+
+      print('');
+      print('═══════════════════════════════════════════════════════════');
+      print('🔵 SEND OTP API CALL');
+      print('═══════════════════════════════════════════════════════════');
+      print('📍 API Endpoint: $url');
+      print('📤 Request Body: ${jsonEncode({'email': email})}');
+      print(
+          '📋 Headers: Content-Type: application/json, Accept: application/json');
+      print('───────────────────────────────────────────────────────────');
+
+      final response = await http
+          .post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: jsonEncode({'email': email}),
+      )
+          .timeout(
+        AppConfig.connectionTimeout,
+        onTimeout: () {
+          throw Exception(
+              'Connection timeout. Please check your internet connection.');
+        },
+      );
+
+      print('📥 Response Status Code: ${response.statusCode}');
+      print('📥 Response Body: ${response.body}');
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final responseData = jsonDecode(response.body);
+        final message = responseData['message'] ?? 'OTP sent successfully';
+        final success = responseData['success'] ?? true;
+
+        print('✅ Success: $success');
+        print('💬 Message: $message');
+        print('📊 Full Response Data: $responseData');
+        print('═══════════════════════════════════════════════════════════');
+        print('');
+
+        return success;
+      } else {
+        final responseData = jsonDecode(response.body);
+        final message = responseData['message'] ??
+            responseData['error'] ??
+            'Failed to send OTP';
+
+        print('❌ Failed: Status ${response.statusCode}');
+        print('💬 Error Message: $message');
+        print('📊 Full Response Data: $responseData');
+        print('═══════════════════════════════════════════════════════════');
+        print('');
+
+        return false;
+      }
+    } catch (e) {
+      print('❌ Send OTP Error: $e');
+      print('═══════════════════════════════════════════════════════════');
+      print('');
+      return false;
+    }
+  }
+
+  /// Verify OTP for email verification
+  ///
+  /// Makes a POST request to {{base_url}}/email-verification/verify-otp
+  /// Expected request body: { "email": "...", "otp": "..." }
+  Future<bool> verifyOtp(String email, String otp) async {
+    try {
+      final url = Uri.parse('$_baseUrl/email-verification/verify-otp');
+
+      print('');
+      print('═══════════════════════════════════════════════════════════');
+      print('🔵 VERIFY OTP API CALL');
+      print('═══════════════════════════════════════════════════════════');
+      print('📍 API Endpoint: $url');
+      print('📤 Request Body: ${jsonEncode({'email': email, 'otp': otp})}');
+      print(
+          '📋 Headers: Content-Type: application/json, Accept: application/json');
+      print('───────────────────────────────────────────────────────────');
+
+      final response = await http
+          .post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: jsonEncode({'email': email, 'otp': otp}),
+      )
+          .timeout(
+        AppConfig.connectionTimeout,
+        onTimeout: () {
+          throw Exception(
+              'Connection timeout. Please check your internet connection.');
+        },
+      );
+
+      print('📥 Response Status Code: ${response.statusCode}');
+      print('📥 Response Body: ${response.body}');
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final responseData = jsonDecode(response.body);
+        final message = responseData['message'] ?? 'OTP verified successfully';
+        final success = responseData['success'] ?? true;
+
+        print('✅ Success: $success');
+        print('💬 Message: $message');
+        print('📊 Full Response Data: $responseData');
+        print('═══════════════════════════════════════════════════════════');
+        print('');
+
+        return success;
+      } else {
+        final responseData = jsonDecode(response.body);
+        final message = responseData['message'] ??
+            responseData['error'] ??
+            'Failed to verify OTP';
+
+        print('❌ Failed: Status ${response.statusCode}');
+        print('💬 Error Message: $message');
+        print('📊 Full Response Data: $responseData');
+        print('═══════════════════════════════════════════════════════════');
+        print('');
+
+        return false;
+      }
+    } catch (e) {
+      print('❌ Verify OTP Error: $e');
+      print('═══════════════════════════════════════════════════════════');
+      print('');
+      return false;
+    }
+  }
+
+  /// Get list of countries
+  ///
+  /// Makes a GET request to {{base_url}}/countries
+  Future<List<Country>> getCountries() async {
+    try {
+      final url = Uri.parse('$_baseUrl/countries');
+
+      print('');
+      print('═══════════════════════════════════════════════════════════');
+      print('🔵 GET COUNTRIES API CALL');
+      print('═══════════════════════════════════════════════════════════');
+      print('📍 API Endpoint: $url');
+      print('───────────────────────────────────────────────────────────');
+
+      final response = await http.get(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+      ).timeout(
+        AppConfig.connectionTimeout,
+        onTimeout: () {
+          throw Exception(
+              'Connection timeout. Please check your internet connection.');
+        },
+      );
+
+      print('📥 Response Status Code: ${response.statusCode}');
+      // print('📥 Response Body: ${response.body}'); // Potentially large output
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+        final success = responseData['success'] ?? false;
+
+        if (success && responseData['data'] != null) {
+          final List<dynamic> data = responseData['data'];
+          final countries = data.map((json) => Country.fromJson(json)).toList();
+
+          print('✅ Success: Retrieved ${countries.length} countries');
+          print('═══════════════════════════════════════════════════════════');
+          print('');
+
+          return countries;
+        } else {
+          print('❌ Failed: Success flag is false or data is null');
+          return [];
+        }
+      } else {
+        print('❌ Failed: Status ${response.statusCode}');
+        print('═══════════════════════════════════════════════════════════');
+        print('');
+        return [];
+      }
+    } catch (e) {
+      print('❌ Get Countries Error: $e');
+      print('═══════════════════════════════════════════════════════════');
+      print('');
+      return [];
+    }
+  }
+
+  /// Get user profile with KYC status and permissions
+  ///
+  /// Makes a GET request to {{base_url}}/user/profile
+  /// Requires authentication token in header
+  Future<UserProfileResponse> getUserProfile() async {
+    try {
+      final url = Uri.parse('$_baseUrl/user/profile');
+      final token = await getToken();
+
+      print('');
+      print('═══════════════════════════════════════════════════════════');
+      print('🔵 GET USER PROFILE API CALL');
+      print('═══════════════════════════════════════════════════════════');
+      print('📍 API Endpoint: $url');
+      print('🔑 Authorization: Bearer ${token != null ? "***" : "null"}');
+      print('───────────────────────────────────────────────────────────');
+
+      if (token == null) {
+        print('❌ Failed: No authentication token found');
+        print('═══════════════════════════════════════════════════════════');
+        print('');
+        return UserProfileResponse(
+          success: false,
+          message: 'Authentication required',
+        );
+      }
+
+      final response = await http.get(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(
+        AppConfig.connectionTimeout,
+        onTimeout: () {
+          throw Exception(
+              'Connection timeout. Please check your internet connection.');
+        },
+      );
+
+      print('📥 Response Status Code: ${response.statusCode}');
+      print('📥 Response Body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+        final profileResponse = UserProfileResponse.fromJson(responseData);
+
+        if (profileResponse.data != null) {
+          print('✅ Success: Profile retrieved');
+          print('   User: ${profileResponse.data!.name}');
+          print('   Email: ${profileResponse.data!.email}');
+          print(
+              '   KYC Status: ${profileResponse.data!.authorization.kycStatus.status}');
+          print(
+              '   Is Active: ${profileResponse.data!.authorization.isActive}');
+        }
+        print('═══════════════════════════════════════════════════════════');
+        print('');
+
+        return profileResponse;
+      } else {
+        final responseData = jsonDecode(response.body);
+        print('❌ Failed: Status ${response.statusCode}');
+        print('═══════════════════════════════════════════════════════════');
+        print('');
+        return UserProfileResponse(
+          success: false,
+          message: responseData['message'] ?? 'Failed to get profile',
+        );
+      }
+    } catch (e) {
+      print('❌ Get User Profile Error: $e');
+      print('═══════════════════════════════════════════════════════════');
+      print('');
+      return UserProfileResponse(
+        success: false,
+        message: 'An error occurred while fetching profile',
+      );
     }
   }
 }

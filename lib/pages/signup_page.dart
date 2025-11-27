@@ -2,6 +2,13 @@ import 'package:flutter/material.dart';
 import '../theme/app_theme.dart';
 import 'package:ouro_pay_consumer_app/widgets/logo.dart';
 import 'package:ouro_pay_consumer_app/services/auth_service.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
+import 'package:pinput/pinput.dart';
+import 'dart:io';
+import 'package:ouro_pay_consumer_app/models/country.dart';
+import 'package:country_code_picker/country_code_picker.dart';
 
 class SignUpPage extends StatefulWidget {
   const SignUpPage({super.key});
@@ -16,7 +23,7 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
   late Animation<double> _fadeAnimation;
 
   int _currentStep = 0;
-  final int _totalSteps = 4;
+  final int _totalSteps = 5;
 
   // Form controllers
   final _personalFormKey = GlobalKey<FormState>();
@@ -27,9 +34,11 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
   final _dobController = TextEditingController();
+  final _otpController = TextEditingController();
 
   // Field-specific error messages from API
   String? _firstNameError;
+
   String? _lastNameError;
   String? _emailError;
   String? _phoneError;
@@ -37,33 +46,46 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
   String? _dobError;
 
   // KYC state
-  String _selectedCountry = 'United States';
+  // Removed static selected country; will be set dynamically
   String _selectedDocumentType = 'Passport';
   bool _documentsUploaded = false;
   bool _selfieCompleted = false;
   bool _termsAccepted = false;
   bool _isStepOneSubmitting = false;
+  bool _isOtpSubmitting = false;
+
+  // Document file (single upload - PDF or photo)
+  File? _documentFile;
+  String? _documentPath;
+  File? _selfieFile;
+  String? _selfiePath;
+  final ImagePicker _imagePicker = ImagePicker();
 
   // Password visibility toggles
   bool _isPasswordVisible = false;
   bool _isConfirmPasswordVisible = false;
 
-  @override
+  // Country data
+  List<Country> _countries = [];
+  bool _isLoadingCountries = false;
+  Country? _selectedCountry;
+
+  // Country code for phone number
+  String _countryCode = '+1'; // Default to US
+
+  late FaceDetector _faceDetector;
+
   void initState() {
     super.initState();
     _pageController = PageController();
     _fadeController = AnimationController(
-      duration: const Duration(milliseconds: 300),
       vsync: this,
+      duration: const Duration(milliseconds: 500),
     );
-    _fadeAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _fadeController,
-      curve: Curves.easeInOut,
-    ));
+    _fadeAnimation =
+        Tween<double>(begin: 0.0, end: 1.0).animate(_fadeController);
     _fadeController.forward();
+    _fetchCountries();
   }
 
   @override
@@ -77,6 +99,7 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     _dobController.dispose();
+    _otpController.dispose();
     super.dispose();
   }
 
@@ -145,6 +168,7 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
                 physics: const NeverScrollableScrollPhysics(),
                 children: [
                   _buildPersonalInfoStep(),
+                  _buildOtpVerificationStep(),
                   _buildDocumentVerificationStep(),
                   _buildSelfieVerificationStep(),
                   _buildReviewAndSubmitStep(),
@@ -209,7 +233,8 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
                           ),
                           if (index < _totalSteps - 1)
                             Container(
-                              width: 40, // Fixed width for connectors
+                              width:
+                                  30, // Reduced width for connectors to fit 5 steps
                               height: 2,
                               color: index < _currentStep
                                   ? AppColors.primaryGold
@@ -242,10 +267,12 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
       case 0:
         return 'Personal Information';
       case 1:
-        return 'Document Verification';
+        return 'Email Verification';
       case 2:
-        return 'Identity Verification';
+        return 'Document Verification';
       case 3:
+        return 'Identity Verification';
+      case 4:
         return 'Review & Submit';
       default:
         return '';
@@ -361,28 +388,104 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
             ),
             const SizedBox(height: 16),
 
-            // Phone Number
-            _buildTextField(
-              controller: _phoneController,
-              label: 'Phone Number',
-              icon: Icons.phone_outlined,
-              keyboardType: TextInputType.phone,
-              errorText: _phoneError,
-              onChanged: () {
-                if (_phoneError != null) {
-                  setState(() {
-                    _phoneError = null;
-                  });
-                }
-              },
+            // Phone Number with Country Code
+            FormField<String>(
               validator: (value) {
+                if (_phoneController.text.isEmpty) {
+                  return 'Please enter your phone number';
+                }
                 if (_phoneError != null) {
                   return _phoneError;
                 }
-                if (value == null || value.isEmpty) {
-                  return 'Please enter your phone number';
-                }
                 return null;
+              },
+              builder: (FormFieldState<String> state) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      decoration: BoxDecoration(
+                        color: AppColors.cardBackground,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: state.hasError
+                              ? AppColors.errorRed
+                              : AppColors.greyText.withOpacity(0.3),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          CountryCodePicker(
+                            onChanged: (countryCode) {
+                              setState(() {
+                                _countryCode = countryCode.dialCode ?? '+1';
+                              });
+                            },
+                            initialSelection: 'US',
+                            favorite: const ['+1', '+880', '+44', '+91'],
+                            showCountryOnly: false,
+                            showOnlyCountryWhenClosed: false,
+                            alignLeft: false,
+                            backgroundColor: AppColors.cardBackground,
+                            dialogBackgroundColor: AppColors.cardBackground,
+                            textStyle:
+                                const TextStyle(color: AppColors.whiteText),
+                            dialogTextStyle:
+                                const TextStyle(color: AppColors.whiteText),
+                            searchDecoration: InputDecoration(
+                              hintText: 'Search country',
+                              hintStyle: TextStyle(color: AppColors.greyText),
+                              fillColor: AppColors.darkBackground,
+                              filled: true,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: BorderSide.none,
+                              ),
+                            ),
+                            searchStyle:
+                                const TextStyle(color: AppColors.whiteText),
+                          ),
+                          Container(
+                            height: 24,
+                            width: 1,
+                            color: AppColors.greyText.withOpacity(0.3),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: TextField(
+                              controller: _phoneController,
+                              keyboardType: TextInputType.phone,
+                              style:
+                                  const TextStyle(color: AppColors.whiteText),
+                              decoration: const InputDecoration(
+                                border: InputBorder.none,
+                                hintText: null,
+                              ),
+                              onChanged: (value) {
+                                state.didChange(value);
+                                if (_phoneError != null) {
+                                  setState(() => _phoneError = null);
+                                }
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                        ],
+                      ),
+                    ),
+                    if (state.hasError)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8, left: 12),
+                        child: Text(
+                          state.errorText!,
+                          style: const TextStyle(
+                            color: AppColors.errorRed,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                  ],
+                );
               },
             ),
             const SizedBox(height: 16),
@@ -527,9 +630,9 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
                 onPressed: _isStepOneSubmitting
                     ? null
                     : () {
-                        if (_personalFormKey.currentState!.validate()) {
-                          _handleStepOneContinue();
-                        }
+                        // if (_personalFormKey.currentState!.validate()) {
+                        _handleStepOneContinue();
+                        // }
                       },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primaryGold,
@@ -571,17 +674,8 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
     });
 
     try {
-      final authService = AuthService();
-      final dateOfBirthISO = _formatDateOfBirth(_dobController.text);
-
-      final response = await authService.register(
-        first_name: _firstNameController.text.trim(),
-        last_name: _lastNameController.text.trim(),
-        email: _emailController.text.trim(),
-        phone: _phoneController.text.trim(),
-        date_of_birth: dateOfBirthISO,
-        password: _passwordController.text,
-      );
+      final email = _emailController.text.trim();
+      final success = await AuthService().sendOtp(email);
 
       if (!mounted) return;
 
@@ -589,124 +683,232 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
         _isStepOneSubmitting = false;
       });
 
-      if (response.success) {
-        if (response.token != null) {
-          await authService.saveToken(response.token!);
-        }
-        if (response.user != null) {
-          await authService.saveUserData(response.user!);
-        } else if (response.data != null &&
-            response.data!['user'] != null &&
-            response.data!['user'] is Map<String, dynamic>) {
-          await authService
-              .saveUserData(response.data!['user'] as Map<String, dynamic>);
-        }
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(response.message ??
-                'Account created. Continue with verification steps.'),
-            backgroundColor: AppColors.primaryGold,
-          ),
-        );
-
+      if (success) {
+        // Show success message at top and proceed to next step
+        _showTopSnackBar('OTP sent successfully. Please check your email.',
+            AppColors.successGreen);
         _nextStep();
       } else {
-        // Handle field-specific validation errors
-        print(
-            '🔴 Registration failed. Response fieldErrors: ${response.fieldErrors}');
-        if (response.fieldErrors != null && response.fieldErrors!.isNotEmpty) {
-          // Map API field errors to our field error variables
-          // Handle various possible field name formats
-          Map<String, String> fieldErrorMap = {};
-          response.fieldErrors!.forEach((field, error) {
-            print('  📍 Mapping field error: "$field" -> "$error"');
-            switch (field.toLowerCase()) {
-              case 'firstname':
-              case 'first_name':
-                fieldErrorMap['firstName'] = error;
-                break;
-              case 'lastname':
-              case 'last_name':
-                fieldErrorMap['lastName'] = error;
-                break;
-              case 'email':
-                fieldErrorMap['email'] = error;
-                break;
-              case 'phone':
-              case 'phonenumber':
-              case 'phone_number':
-                fieldErrorMap['phone'] = error;
-                break;
-              case 'password':
-                fieldErrorMap['password'] = error;
-                break;
-              case 'dateofbirth':
-              case 'date_of_birth':
-              case 'dob':
-                fieldErrorMap['dob'] = error;
-                break;
-            }
-          });
-
-          print('✅ Mapped field errors: $fieldErrorMap');
-
-          // Set all error state variables in one setState call
-          setState(() {
-            _firstNameError = fieldErrorMap['firstName'];
-            _lastNameError = fieldErrorMap['lastName'];
-            _emailError = fieldErrorMap['email'];
-            _phoneError = fieldErrorMap['phone'];
-            _passwordError = fieldErrorMap['password'];
-            _dobError = fieldErrorMap['dob'];
-          });
-
-          print(
-              '✅ Set state errors - firstName: $_firstNameError, email: $_emailError, phone: $_phoneError');
-
-          // Trigger form validation to show the errors
-          // Use a small delay to ensure state is updated before validation
-          Future.delayed(const Duration(milliseconds: 300), () {
-            if (mounted) {
-              // Force validation on all fields to display the errors
-              _personalFormKey.currentState?.validate();
-            }
-          });
-
-          // Show snackbar message along with field-specific errors
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(response.message ??
-                  'Validation failed. Please check the fields below.'),
-              backgroundColor: AppColors.errorRed,
-              duration: const Duration(seconds: 4),
-            ),
-          );
-        } else {
-          // Show generic error message if no field-specific errors were provided
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(response.message ??
-                  'Registration failed. Please check your information and try again.'),
-              backgroundColor: AppColors.errorRed,
-              duration: const Duration(seconds: 4),
-            ),
-          );
-        }
+        _showTopSnackBar(
+            'Failed to send OTP. Please try again.', AppColors.errorRed);
       }
     } catch (e) {
       if (!mounted) return;
-
       setState(() {
         _isStepOneSubmitting = false;
       });
+      _showTopSnackBar('An error occurred: $e', AppColors.errorRed);
+    }
+  }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('An unexpected error occurred: ${e.toString()}'),
-          backgroundColor: AppColors.errorRed,
-        ),
-      );
+  Widget _buildOtpVerificationStep() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const OuroPayIcon(size: 48),
+          const SizedBox(height: 24),
+
+          const Text(
+            'Check your email',
+            style: TextStyle(
+              fontSize: 28,
+              fontWeight: FontWeight.bold,
+              color: AppColors.whiteText,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'We sent a verification code to ${_emailController.text}',
+            style: const TextStyle(
+              fontSize: 16,
+              color: AppColors.greyText,
+            ),
+          ),
+          const SizedBox(height: 32),
+
+          // OTP PIN Input
+          Pinput(
+            controller: _otpController,
+            length: 6,
+            defaultPinTheme: PinTheme(
+              width: 56,
+              height: 56,
+              textStyle: const TextStyle(
+                fontSize: 20,
+                color: AppColors.whiteText,
+                fontWeight: FontWeight.w600,
+              ),
+              decoration: BoxDecoration(
+                color: AppColors.cardBackground,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: AppColors.greyText.withOpacity(0.3),
+                ),
+              ),
+            ),
+            focusedPinTheme: PinTheme(
+              width: 56,
+              height: 56,
+              textStyle: const TextStyle(
+                fontSize: 20,
+                color: AppColors.whiteText,
+                fontWeight: FontWeight.w600,
+              ),
+              decoration: BoxDecoration(
+                color: AppColors.cardBackground,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: AppColors.primaryGold,
+                  width: 2,
+                ),
+              ),
+            ),
+            submittedPinTheme: PinTheme(
+              width: 56,
+              height: 56,
+              textStyle: const TextStyle(
+                fontSize: 20,
+                color: AppColors.whiteText,
+                fontWeight: FontWeight.w600,
+              ),
+              decoration: BoxDecoration(
+                color: AppColors.cardBackground,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: AppColors.primaryGold.withOpacity(0.5),
+                ),
+              ),
+            ),
+            errorPinTheme: PinTheme(
+              width: 56,
+              height: 56,
+              textStyle: const TextStyle(
+                fontSize: 20,
+                color: AppColors.whiteText,
+                fontWeight: FontWeight.w600,
+              ),
+              decoration: BoxDecoration(
+                color: AppColors.cardBackground,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: AppColors.errorRed,
+                  width: 2,
+                ),
+              ),
+            ),
+            pinputAutovalidateMode: PinputAutovalidateMode.onSubmit,
+            showCursor: true,
+            onCompleted: (pin) {
+              // Auto-submit when all 6 digits are entered
+              if (pin.length == 6) {
+                _handleOtpVerification();
+              }
+            },
+          ),
+          const SizedBox(height: 32),
+
+          // Verify Button
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _isOtpSubmitting ? null : _handleOtpVerification,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryGold,
+                foregroundColor: AppColors.darkBackground,
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: _isOtpSubmitting
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        color: AppColors.darkBackground,
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : const Text(
+                      'Verify Email',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Center(
+            child: TextButton(
+              onPressed: _isOtpSubmitting
+                  ? null
+                  : () async {
+                      // Resend OTP logic
+                      await _handleStepOneContinue();
+                    },
+              child: const Text(
+                'Resend Code',
+                style: TextStyle(color: AppColors.primaryGold),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _handleOtpVerification() async {
+    if (_isOtpSubmitting) return;
+
+    final otp = _otpController.text.trim();
+    if (otp.isEmpty) {
+      _showTopSnackBar(
+          'Please enter the verification code', AppColors.errorRed);
+      return;
+    }
+
+    if (otp.length != 6) {
+      _showTopSnackBar('Please enter all 6 digits', AppColors.errorRed);
+      return;
+    }
+
+    setState(() {
+      _isOtpSubmitting = true;
+    });
+
+    try {
+      final email = _emailController.text.trim();
+      final success = await AuthService().verifyOtp(email, otp);
+
+      if (!mounted) return;
+
+      setState(() {
+        _isOtpSubmitting = false;
+      });
+
+      if (success) {
+        _showTopSnackBar(
+            'Email verified successfully!', AppColors.successGreen);
+      } else {
+        _showTopSnackBar('Verification failed, but proceeding for development',
+            AppColors.warningOrange);
+      }
+
+      // Proceed to next step regardless of verification result (for development)
+      _nextStep();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isOtpSubmitting = false;
+      });
+      _showTopSnackBar('Error occurred, but proceeding for development',
+          AppColors.warningOrange);
+
+      // Proceed to next step even on error (for development)
+      _nextStep();
     }
   }
 
@@ -744,37 +946,74 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
             ),
           ),
           const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            decoration: BoxDecoration(
-              color: AppColors.cardBackground,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.greyText.withOpacity(0.3)),
-            ),
-            child: DropdownButtonHideUnderline(
-              child: DropdownButton<String>(
-                value: _selectedCountry,
-                isExpanded: true,
-                dropdownColor: AppColors.cardBackground,
-                style: const TextStyle(color: AppColors.whiteText),
-                items: const [
-                  DropdownMenuItem(
-                      value: 'United States', child: Text('United States')),
-                  DropdownMenuItem(value: 'Canada', child: Text('Canada')),
-                  DropdownMenuItem(
-                      value: 'United Kingdom', child: Text('United Kingdom')),
-                  DropdownMenuItem(value: 'Germany', child: Text('Germany')),
-                  DropdownMenuItem(value: 'France', child: Text('France')),
-                  DropdownMenuItem(value: 'Suriname', child: Text('Suriname')),
-                ],
-                onChanged: (value) {
-                  setState(() {
-                    _selectedCountry = value!;
-                  });
-                },
-              ),
-            ),
-          ),
+          _isLoadingCountries
+              ? Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppColors.cardBackground,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: AppColors.greyText.withOpacity(0.3),
+                    ),
+                  ),
+                  child: const Row(
+                    children: [
+                      SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppColors.primaryGold,
+                        ),
+                      ),
+                      SizedBox(width: 12),
+                      Text(
+                        'Loading countries...',
+                        style: TextStyle(color: AppColors.greyText),
+                      ),
+                    ],
+                  ),
+                )
+              : DropdownButtonFormField<Country>(
+                  value: _selectedCountry,
+                  decoration: InputDecoration(
+                    filled: true,
+                    fillColor: AppColors.cardBackground,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: AppColors.greyText.withOpacity(0.3),
+                      ),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(
+                        color: AppColors.greyText.withOpacity(0.3),
+                      ),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(
+                        color: AppColors.primaryGold,
+                        width: 2,
+                      ),
+                    ),
+                  ),
+                  isExpanded: true,
+                  dropdownColor: AppColors.cardBackground,
+                  style: const TextStyle(color: AppColors.whiteText),
+                  items: _countries
+                      .map((country) => DropdownMenuItem<Country>(
+                            value: country,
+                            child: Text(country.name),
+                          ))
+                      .toList(),
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedCountry = value;
+                    });
+                  },
+                ),
           const SizedBox(height: 24),
 
           // Document Type Selection
@@ -826,7 +1065,7 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
                 const SizedBox(height: 16),
                 Text(
                   _documentsUploaded
-                      ? 'Documents uploaded successfully!'
+                      ? 'Document uploaded successfully!'
                       : 'Upload $_selectedDocumentType',
                   style: TextStyle(
                     fontSize: 18,
@@ -835,18 +1074,50 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
                         ? AppColors.successGreen
                         : AppColors.whiteText,
                   ),
+                  textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 8),
-                Text(
-                  _documentsUploaded
-                      ? 'Front and back sides captured'
-                      : 'We\'ll guide you through taking photos of both sides',
-                  style: const TextStyle(
+                const Text(
+                  'Select PDF, JPG, PNG or take a photo',
+                  style: TextStyle(
                     fontSize: 14,
                     color: AppColors.greyText,
                   ),
                   textAlign: TextAlign.center,
                 ),
+
+                // Show uploaded file
+                if (_documentFile != null) ...[
+                  const SizedBox(height: 24),
+                  const Divider(color: AppColors.greyText),
+                  const SizedBox(height: 16),
+
+                  // Document preview
+                  _buildDocumentPreview(
+                    'Document',
+                    _documentPath!,
+                    _documentFile!,
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // Reset button
+                  TextButton.icon(
+                    onPressed: () {
+                      setState(() {
+                        _documentFile = null;
+                        _documentPath = null;
+                        _documentsUploaded = false;
+                      });
+                    },
+                    icon: const Icon(Icons.refresh, color: AppColors.errorRed),
+                    label: const Text(
+                      'Reset and Upload Again',
+                      style: TextStyle(color: AppColors.errorRed),
+                    ),
+                  ),
+                ],
+
                 const SizedBox(height: 16),
                 if (!_documentsUploaded)
                   ElevatedButton.icon(
@@ -859,8 +1130,8 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
                         vertical: 12,
                       ),
                     ),
-                    icon: const Icon(Icons.camera_alt),
-                    label: const Text('Start Capture'),
+                    icon: const Icon(Icons.upload_file),
+                    label: const Text('Upload Document'),
                   ),
               ],
             ),
@@ -952,54 +1223,122 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
           const SizedBox(height: 32),
 
           // Selfie Capture Area
-          Container(
-            width: double.infinity,
-            height: 300,
-            decoration: BoxDecoration(
-              color: AppColors.cardBackground,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: _selfieCompleted
-                    ? AppColors.successGreen
-                    : AppColors.greyText.withOpacity(0.3),
-                width: 2,
-              ),
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+          if (_selfieFile != null)
+            // Show preview when selfie is captured
+            Column(
               children: [
-                Icon(
-                  _selfieCompleted ? Icons.check_circle : Icons.camera_front,
-                  size: 64,
-                  color: _selfieCompleted
-                      ? AppColors.successGreen
-                      : AppColors.primaryGold,
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  _selfieCompleted
-                      ? 'Selfie captured successfully!'
-                      : 'Ready to take your selfie?',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: _selfieCompleted
-                        ? AppColors.successGreen
-                        : AppColors.whiteText,
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppColors.cardBackground,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: AppColors.successGreen,
+                      width: 2,
+                    ),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        children: const [
+                          Icon(
+                            Icons.check_circle,
+                            color: AppColors.successGreen,
+                            size: 24,
+                          ),
+                          SizedBox(width: 12),
+                          Text(
+                            'Selfie Captured',
+                            style: TextStyle(
+                              color: AppColors.whiteText,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      // Selfie Preview Image
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Image.file(
+                          _selfieFile!,
+                          height: 250,
+                          width: double.infinity,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Face verification completed ✓',
+                        style: TextStyle(
+                          color: AppColors.successGreen,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  _selfieCompleted
-                      ? 'Face verification completed'
-                      : 'Position your face in the frame',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: AppColors.greyText,
+                const SizedBox(height: 16),
+                // Retake button below preview
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: _startSelfieCapture,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.primaryGold,
+                      side: const BorderSide(color: AppColors.primaryGold),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    icon: const Icon(Icons.camera_alt),
+                    label: const Text('Retake Selfie'),
                   ),
                 ),
-                const SizedBox(height: 16),
-                if (!_selfieCompleted)
+              ],
+            )
+          else
+            // Show capture button when no selfie
+            Container(
+              width: double.infinity,
+              height: 300,
+              decoration: BoxDecoration(
+                color: AppColors.cardBackground,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: AppColors.greyText.withOpacity(0.3),
+                  width: 2,
+                ),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(
+                    Icons.camera_front,
+                    size: 64,
+                    color: AppColors.primaryGold,
+                  ),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'Ready to take your selfie?',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.whiteText,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Position your face in the frame',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: AppColors.greyText,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
                   ElevatedButton.icon(
                     onPressed: _startSelfieCapture,
                     style: ElevatedButton.styleFrom(
@@ -1013,9 +1352,9 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
                     icon: const Icon(Icons.camera_alt),
                     label: const Text('Take Selfie'),
                   ),
-              ],
+                ],
+              ),
             ),
-          ),
 
           const SizedBox(height: 32),
 
@@ -1023,7 +1362,7 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: _selfieCompleted ? _nextStep : null,
+              onPressed: _nextStep, // Always enabled for development
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primaryGold,
                 foregroundColor: AppColors.darkBackground,
@@ -1087,7 +1426,7 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
           _buildSummarySection(
             'Identity Verification',
             [
-              'Country: $_selectedCountry',
+              'Country: ${_selectedCountry?.name ?? "Not selected"}',
               'Document Type: $_selectedDocumentType',
               'Document Status: ${_documentsUploaded ? "Uploaded ✓" : "Pending"}',
               'Selfie Status: ${_selfieCompleted ? "Completed ✓" : "Pending"}',
@@ -1377,92 +1716,733 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
     }
   }
 
-  void _startDocumentCapture() {
-    // Simulate document capture process
-    // In real app, this would integrate with Sumsub/Veriff SDK
-    showDialog(
+  Future<void> _startDocumentCapture() async {
+    // Show options for document upload
+    showModalBottomSheet(
       context: context,
+      backgroundColor: AppColors.cardBackground,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Upload Document',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: AppColors.whiteText,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Upload your $_selectedDocumentType',
+              style: const TextStyle(
+                fontSize: 14,
+                color: AppColors.greyText,
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // Take Photo option
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryGold.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.camera_alt,
+                  color: AppColors.primaryGold,
+                ),
+              ),
+              title: const Text(
+                'Take Photo',
+                style: TextStyle(
+                  color: AppColors.whiteText,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              subtitle: const Text(
+                'Use your camera to capture document',
+                style: TextStyle(color: AppColors.greyText, fontSize: 12),
+              ),
+              onTap: () {
+                Navigator.pop(context);
+                _pickImageFromCamera();
+              },
+            ),
+            const SizedBox(height: 8),
+
+            // Choose from Gallery option
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryGold.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.photo_library,
+                  color: AppColors.primaryGold,
+                ),
+              ),
+              title: const Text(
+                'Choose from Gallery',
+                style: TextStyle(
+                  color: AppColors.whiteText,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              subtitle: const Text(
+                'Select JPG or PNG image',
+                style: TextStyle(color: AppColors.greyText, fontSize: 12),
+              ),
+              onTap: () {
+                Navigator.pop(context);
+                _pickImageFromGallery();
+              },
+            ),
+            const SizedBox(height: 8),
+
+            // Select PDF option
+            ListTile(
+              leading: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppColors.primaryGold.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.picture_as_pdf,
+                  color: AppColors.primaryGold,
+                ),
+              ),
+              title: const Text(
+                'Select PDF File',
+                style: TextStyle(
+                  color: AppColors.whiteText,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              subtitle: const Text(
+                'Choose PDF document',
+                style: TextStyle(color: AppColors.greyText, fontSize: 12),
+              ),
+              onTap: () {
+                Navigator.pop(context);
+                _pickPdfFile();
+              },
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickImageFromCamera() async {
+    try {
+      final XFile? image = await _imagePicker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 85,
+        maxWidth: 1920,
+        maxHeight: 1920,
+      );
+
+      if (image != null) {
+        final file = File(image.path);
+        final fileSize = await file.length();
+
+        // Check file size (max 10MB)
+        if (fileSize > 10 * 1024 * 1024) {
+          if (!mounted) return;
+          _showTopSnackBar(
+              'File size must be less than 10MB', AppColors.errorRed);
+          return;
+        }
+
+        setState(() {
+          _documentFile = file;
+          _documentPath = image.path;
+          _documentsUploaded = true;
+        });
+
+        if (!mounted) return;
+
+        _showTopSnackBar(
+            'Document captured successfully!', AppColors.successGreen);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      _showTopSnackBar(
+          'Error capturing image: ${e.toString()}', AppColors.errorRed);
+    }
+  }
+
+  Future<void> _pickImageFromGallery() async {
+    try {
+      final XFile? image = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 85,
+        maxWidth: 1920,
+        maxHeight: 1920,
+      );
+
+      if (image != null) {
+        final file = File(image.path);
+        final fileSize = await file.length();
+
+        // Check file size (max 10MB)
+        if (fileSize > 10 * 1024 * 1024) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('File size must be less than 10MB'),
+              backgroundColor: AppColors.errorRed,
+            ),
+          );
+          return;
+        }
+
+        setState(() {
+          _documentFile = file;
+          _documentPath = image.path;
+          _documentsUploaded = true;
+        });
+
+        if (!mounted) return;
+
+        _showTopSnackBar(
+            'Document selected successfully!', AppColors.successGreen);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      _showTopSnackBar(
+          'Error selecting image: ${e.toString()}', AppColors.errorRed);
+    }
+  }
+
+  Future<void> _pickPdfFile() async {
+    try {
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf'],
+      );
+
+      if (result != null && result.files.single.path != null) {
+        final file = File(result.files.single.path!);
+        final fileSize = await file.length();
+
+        // Check file size (max 10MB)
+        if (fileSize > 10 * 1024 * 1024) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('File size must be less than 10MB'),
+              backgroundColor: AppColors.errorRed,
+            ),
+          );
+          return;
+        }
+
+        setState(() {
+          _documentFile = file;
+          _documentPath = result.files.single.path;
+          _documentsUploaded = true;
+        });
+
+        if (!mounted) return;
+
+        _showTopSnackBar(
+            'Document uploaded successfully!', AppColors.successGreen);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      _showTopSnackBar(
+          'Error selecting PDF: ${e.toString()}', AppColors.errorRed);
+    }
+  }
+
+  Future<void> _startSelfieCapture() async {
+    // 1. Show instructions dialog
+    final bool? proceed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
       builder: (context) => AlertDialog(
         backgroundColor: AppColors.cardBackground,
         title: const Text(
-          'Document Capture',
+          'Selfie Verification',
           style: TextStyle(color: AppColors.whiteText),
         ),
-        content: const Text(
-          'In a real implementation, this would launch the Sumsub or Veriff SDK for document capture.',
-          style: TextStyle(color: AppColors.greyText),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: const [
+            Text(
+              'To verify your identity, please take a clear selfie.',
+              style: TextStyle(color: AppColors.whiteText),
+            ),
+            SizedBox(height: 16),
+            Text(
+              '• Remove glasses, hats, or masks',
+              style: TextStyle(color: AppColors.greyText),
+            ),
+            Text(
+              '• Ensure your face is fully visible',
+              style: TextStyle(color: AppColors.greyText),
+            ),
+            Text(
+              '• Look straight at the camera',
+              style: TextStyle(color: AppColors.greyText),
+            ),
+            Text(
+              '• Ensure good lighting',
+              style: TextStyle(color: AppColors.greyText),
+            ),
+          ],
         ),
         actions: [
           TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              setState(() {
-                _documentsUploaded = true;
-              });
-            },
+            onPressed: () => Navigator.pop(context, false),
             child: const Text(
-              'Simulate Success',
+              'Cancel',
+              style: TextStyle(color: AppColors.greyText),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text(
+              'I\'m Ready',
               style: TextStyle(color: AppColors.primaryGold),
             ),
+          ),
+        ],
+      ),
+    );
+
+    if (proceed != true) return;
+
+    try {
+      // 2. Capture image from front camera
+      final XFile? image = await _imagePicker.pickImage(
+        source: ImageSource.camera,
+        preferredCameraDevice: CameraDevice.front,
+        imageQuality: 85,
+        maxWidth: 1920,
+        maxHeight: 1920,
+      );
+
+      if (image == null) return;
+
+      // 3. Process image for face detection
+      final inputImage = InputImage.fromFilePath(image.path);
+      final options = FaceDetectorOptions(
+        enableClassification: true, // For eyes open/smile
+        enableLandmarks: true, // For detailed positioning if needed
+        performanceMode: FaceDetectorMode.accurate,
+      );
+      final faceDetector = FaceDetector(options: options);
+      final List<Face> faces = await faceDetector.processImage(inputImage);
+      await faceDetector.close();
+
+      if (!mounted) return;
+
+      // 4. Validate face
+      if (faces.isEmpty) {
+        _showError(
+            'No face detected. Please ensure your face is clearly visible.');
+        return;
+      }
+
+      if (faces.length > 1) {
+        _showError(
+            'Multiple faces detected. Please ensure only you are in the frame.');
+        return;
+      }
+
+      final Face face = faces.first;
+
+      // Check head rotation (looking straight)
+      // Euler X: Up/Down (should be close to 0)
+      // Euler Y: Left/Right (should be close to 0)
+      final double? rotX = face.headEulerAngleX;
+      final double? rotY = face.headEulerAngleY;
+
+      if (rotX != null && (rotX < -15 || rotX > 15)) {
+        _showError('Please look straight at the camera (head tilted up/down).');
+        return;
+      }
+
+      if (rotY != null && (rotY < -15 || rotY > 15)) {
+        _showError(
+            'Please look straight at the camera (head turned left/right).');
+        return;
+      }
+
+      // Check eyes open probability (detect blinking or sunglasses)
+      // Note: Probability is null if classification is not enabled or detection failed
+      final double? leftEyeOpen = face.leftEyeOpenProbability;
+      final double? rightEyeOpen = face.rightEyeOpenProbability;
+
+      if (leftEyeOpen != null && rightEyeOpen != null) {
+        if (leftEyeOpen < 0.5 || rightEyeOpen < 0.5) {
+          _showError(
+              'Eyes not clearly visible. Please remove sunglasses and don\'t blink.');
+          return;
+        }
+      }
+
+      // 5. Success - Save the selfie
+      setState(() {
+        _selfieCompleted = true;
+        _selfieFile = File(image.path);
+        _selfiePath = image.path;
+      });
+
+      // Show success snackbar (preview is already visible on the page)
+      _showTopSnackBar('Selfie verified successfully!', AppColors.successGreen);
+    } catch (e) {
+      if (!mounted) return;
+      _showError('Error processing selfie: ${e.toString()}');
+    }
+  }
+
+  void _showTopSnackBar(String message, Color color) {
+    final height = MediaQuery.of(context).size.height;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: color,
+        duration: const Duration(seconds: 3),
+        behavior: SnackBarBehavior.floating,
+        margin: EdgeInsets.only(bottom: height - 140, left: 16, right: 16),
+      ),
+    );
+  }
+
+  void _showError(String message) {
+    _showTopSnackBar(message, AppColors.errorRed);
+  }
+
+  Widget _buildDocumentPreview(String label, String path, File file) {
+    final isPdf = path.toLowerCase().endsWith('.pdf');
+    final fileName = path.split('/').last;
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.darkBackground,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.primaryGold.withOpacity(0.3)),
+      ),
+      child: Row(
+        children: [
+          // Preview or icon
+          Container(
+            width: 60,
+            height: 60,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(8),
+              color: AppColors.cardBackground,
+            ),
+            child: isPdf
+                ? const Icon(
+                    Icons.picture_as_pdf,
+                    color: AppColors.errorRed,
+                    size: 32,
+                  )
+                : ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: Image.file(
+                      file,
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return const Icon(
+                          Icons.image,
+                          color: AppColors.greyText,
+                          size: 32,
+                        );
+                      },
+                    ),
+                  ),
+          ),
+          const SizedBox(width: 12),
+          // File info
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    color: AppColors.whiteText,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 14,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  fileName,
+                  style: const TextStyle(
+                    color: AppColors.greyText,
+                    fontSize: 12,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          const Icon(
+            Icons.check_circle,
+            color: AppColors.successGreen,
+            size: 24,
           ),
         ],
       ),
     );
   }
 
-  void _startSelfieCapture() {
-    // Simulate selfie capture process
-    // In real app, this would integrate with Sumsub/Veriff SDK
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppColors.cardBackground,
-        title: const Text(
-          'Selfie Capture',
-          style: TextStyle(color: AppColors.whiteText),
-        ),
-        content: const Text(
-          'In a real implementation, this would launch the Sumsub or Veriff SDK for selfie capture and liveness detection.',
-          style: TextStyle(color: AppColors.greyText),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              setState(() {
-                _selfieCompleted = true;
-              });
-            },
-            child: const Text(
-              'Simulate Success',
-              style: TextStyle(color: AppColors.primaryGold),
-            ),
-          ),
-        ],
-      ),
-    );
+  Future<void> _fetchCountries() async {
+    setState(() {
+      _isLoadingCountries = true;
+    });
+
+    try {
+      final countries = await AuthService().getCountries();
+
+      if (!mounted) return;
+
+      setState(() {
+        _countries = countries;
+        _isLoadingCountries = false;
+
+        // Set default country if available
+        if (_countries.isNotEmpty && _selectedCountry == null) {
+          _selectedCountry = _countries.first;
+        }
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      setState(() {
+        _isLoadingCountries = false;
+      });
+
+      print('Error fetching countries: $e');
+
+      // Show error message to user
+      _showTopSnackBar('Failed to load countries: $e', AppColors.errorRed);
+    }
   }
 
   bool _canSubmit() {
     return _documentsUploaded && _selfieCompleted && _termsAccepted;
   }
 
+  String _getDocumentTypeForApi() {
+    // Map UI document type to API format
+    switch (_selectedDocumentType) {
+      case 'Passport':
+        return 'passport';
+      case 'Driver\'s License':
+        return 'drivers_license';
+      case 'National ID':
+        return 'national_id';
+      default:
+        return 'passport';
+    }
+  }
+
   Future<void> _submitRegistration() async {
+    // Validate all required fields
+    if (_selectedCountry == null) {
+      _showError('Please select a country');
+      return;
+    }
+
+    if (_documentFile == null || _documentPath == null) {
+      _showError('Please upload your identity document');
+      return;
+    }
+
+    if (_selfieFile == null || _selfiePath == null) {
+      _showError('Please complete selfie verification');
+      return;
+    }
+
+    if (!_termsAccepted) {
+      _showError('Please accept the terms and conditions');
+      return;
+    }
+
+    // Show loading dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: Card(
+          color: AppColors.cardBackground,
+          child: Padding(
+            padding: EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                CircularProgressIndicator(color: AppColors.primaryGold),
+                SizedBox(height: 16),
+                Text(
+                  'Creating your account...',
+                  style: TextStyle(color: AppColors.whiteText),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+
+    try {
+      // Format date of birth to ISO format (YYYY-MM-DD)
+      final formattedDob = _formatDateOfBirth(_dobController.text);
+
+      // Call registration API with documents
+      final response = await AuthService().registerWithDocuments(
+        firstName: _firstNameController.text.trim(),
+        lastName: _lastNameController.text.trim(),
+        email: _emailController.text.trim(),
+        password: _passwordController.text,
+        dateOfBirth: formattedDob,
+        phone: '$_countryCode${_phoneController.text.trim()}',
+        otp: '000000', // Fixed OTP as per requirement
+        countryId: _selectedCountry!.id,
+        documentType: _getDocumentTypeForApi(),
+        documentPath: _documentPath!,
+        selfiePath: _selfiePath!,
+      );
+
+      if (!mounted) return;
+
+      // Close loading dialog
+      Navigator.of(context).pop();
+
+      if (response.success) {
+        // Reset form fields
+        _resetForm();
+
+        // Navigate to login page and return true to indicate success
+        Navigator.of(context).pop(true);
+      } else {
+        // Handle validation errors
+        if (response.errors != null && response.errors!.isNotEmpty) {
+          // Build error message from all field errors
+          final errorMessages = <String>[];
+          response.errors!.forEach((field, messages) {
+            errorMessages.addAll(messages);
+          });
+
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              backgroundColor: AppColors.cardBackground,
+              title: const Row(
+                children: [
+                  Icon(Icons.error_outline,
+                      color: AppColors.errorRed, size: 32),
+                  SizedBox(width: 12),
+                  Text(
+                    'Validation Error',
+                    style: TextStyle(color: AppColors.errorRed),
+                  ),
+                ],
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: errorMessages
+                      .map((error) => Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 4),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text('• ',
+                                    style:
+                                        TextStyle(color: AppColors.errorRed)),
+                                Expanded(
+                                  child: Text(
+                                    error,
+                                    style: const TextStyle(
+                                        color: AppColors.whiteText),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ))
+                      .toList(),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    _resetForm();
+                  },
+                  child: const Text(
+                    'OK',
+                    style: TextStyle(color: AppColors.primaryGold),
+                  ),
+                ),
+              ],
+            ),
+          );
+        } else {
+          // Show general error message in a Dialog
+          _showErrorDialog('Error',
+              response.message ?? 'Registration failed. Please try again.');
+        }
+      }
+    } catch (e) {
+      if (!mounted) return;
+
+      // Close loading dialog
+      Navigator.of(context).pop();
+
+      _showErrorDialog('Error', 'An error occurred: ${e.toString()}');
+    }
+  }
+
+  void _showErrorDialog(String title, String message) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: AppColors.cardBackground,
-        title: const Text(
-          'Additional Steps Pending',
-          style: TextStyle(color: AppColors.primaryGold),
+        title: Row(
+          children: [
+            const Icon(Icons.error_outline,
+                color: AppColors.errorRed, size: 32),
+            const SizedBox(width: 12),
+            Text(
+              title,
+              style: const TextStyle(color: AppColors.errorRed),
+            ),
+          ],
         ),
-        content: const Text(
-          'KYC and verification endpoints will be implemented in upcoming steps.',
-          style: TextStyle(color: AppColors.whiteText),
+        content: Text(
+          message,
+          style: const TextStyle(color: AppColors.whiteText),
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(),
+            onPressed: () {
+              Navigator.of(context).pop();
+              _resetForm();
+            },
             child: const Text(
               'OK',
               style: TextStyle(color: AppColors.primaryGold),
@@ -1471,6 +2451,35 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
         ],
       ),
     );
+  }
+
+  void _resetForm() {
+    _firstNameController.clear();
+    _lastNameController.clear();
+    _emailController.clear();
+    _phoneController.clear();
+    _passwordController.clear();
+    _confirmPasswordController.clear();
+    _dobController.clear();
+    _otpController.clear();
+
+    setState(() {
+      _documentFile = null;
+      _documentPath = null;
+      _documentsUploaded = false;
+      _selfieFile = null;
+      _selfiePath = null;
+      _selfieCompleted = false;
+      _termsAccepted = false;
+      _currentStep = 0;
+      _selectedCountry = null;
+      _countryCode = '+1';
+    });
+
+    // Reset page controller to first page
+    if (_pageController.hasClients) {
+      _pageController.jumpToPage(0);
+    }
   }
 
   String _formatDateOfBirth(String value) {
