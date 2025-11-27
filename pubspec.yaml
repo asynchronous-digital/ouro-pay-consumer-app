@@ -60,6 +60,9 @@ dependencies:
   
   # PIN input field
   pinput: ^5.0.0
+  
+  # Country code picker for phone numbers
+  country_code_picker: ^3.0.0
 
 dev_dependencies:
   flutter_test:

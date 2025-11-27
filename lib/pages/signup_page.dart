@@ -8,6 +8,7 @@ import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:pinput/pinput.dart';
 import 'dart:io';
 import 'package:ouro_pay_consumer_app/models/country.dart';
+import 'package:country_code_picker/country_code_picker.dart';
 
 class SignUpPage extends StatefulWidget {
   const SignUpPage({super.key});
@@ -68,6 +69,9 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
   List<Country> _countries = [];
   bool _isLoadingCountries = false;
   Country? _selectedCountry;
+
+  // Country code for phone number
+  String _countryCode = '+1'; // Default to US
 
   late FaceDetector _faceDetector;
 
@@ -384,28 +388,104 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
             ),
             const SizedBox(height: 16),
 
-            // Phone Number
-            _buildTextField(
-              controller: _phoneController,
-              label: 'Phone Number',
-              icon: Icons.phone_outlined,
-              keyboardType: TextInputType.phone,
-              errorText: _phoneError,
-              onChanged: () {
-                if (_phoneError != null) {
-                  setState(() {
-                    _phoneError = null;
-                  });
-                }
-              },
+            // Phone Number with Country Code
+            FormField<String>(
               validator: (value) {
+                if (_phoneController.text.isEmpty) {
+                  return 'Please enter your phone number';
+                }
                 if (_phoneError != null) {
                   return _phoneError;
                 }
-                if (value == null || value.isEmpty) {
-                  return 'Please enter your phone number';
-                }
                 return null;
+              },
+              builder: (FormFieldState<String> state) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      decoration: BoxDecoration(
+                        color: AppColors.cardBackground,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: state.hasError
+                              ? AppColors.errorRed
+                              : AppColors.greyText.withOpacity(0.3),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          CountryCodePicker(
+                            onChanged: (countryCode) {
+                              setState(() {
+                                _countryCode = countryCode.dialCode ?? '+1';
+                              });
+                            },
+                            initialSelection: 'US',
+                            favorite: const ['+1', '+880', '+44', '+91'],
+                            showCountryOnly: false,
+                            showOnlyCountryWhenClosed: false,
+                            alignLeft: false,
+                            backgroundColor: AppColors.cardBackground,
+                            dialogBackgroundColor: AppColors.cardBackground,
+                            textStyle:
+                                const TextStyle(color: AppColors.whiteText),
+                            dialogTextStyle:
+                                const TextStyle(color: AppColors.whiteText),
+                            searchDecoration: InputDecoration(
+                              hintText: 'Search country',
+                              hintStyle: TextStyle(color: AppColors.greyText),
+                              fillColor: AppColors.darkBackground,
+                              filled: true,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                borderSide: BorderSide.none,
+                              ),
+                            ),
+                            searchStyle:
+                                const TextStyle(color: AppColors.whiteText),
+                          ),
+                          Container(
+                            height: 24,
+                            width: 1,
+                            color: AppColors.greyText.withOpacity(0.3),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: TextField(
+                              controller: _phoneController,
+                              keyboardType: TextInputType.phone,
+                              style:
+                                  const TextStyle(color: AppColors.whiteText),
+                              decoration: const InputDecoration(
+                                border: InputBorder.none,
+                                hintText: null,
+                              ),
+                              onChanged: (value) {
+                                state.didChange(value);
+                                if (_phoneError != null) {
+                                  setState(() => _phoneError = null);
+                                }
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                        ],
+                      ),
+                    ),
+                    if (state.hasError)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8, left: 12),
+                        child: Text(
+                          state.errorText!,
+                          style: const TextStyle(
+                            color: AppColors.errorRed,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                  ],
+                );
               },
             ),
             const SizedBox(height: 16),
@@ -604,33 +684,20 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
       });
 
       if (success) {
-        // Show success message and proceed to next step
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('OTP sent successfully. Please check your email.'),
-            backgroundColor: AppColors.successGreen,
-          ),
-        );
+        // Show success message at top and proceed to next step
+        _showTopSnackBar('OTP sent successfully. Please check your email.',
+            AppColors.successGreen);
         _nextStep();
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Failed to send OTP. Please try again.'),
-            backgroundColor: AppColors.errorRed,
-          ),
-        );
+        _showTopSnackBar(
+            'Failed to send OTP. Please try again.', AppColors.errorRed);
       }
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _isStepOneSubmitting = false;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('An error occurred: $e'),
-          backgroundColor: AppColors.errorRed,
-        ),
-      );
+      _showTopSnackBar('An error occurred: $e', AppColors.errorRed);
     }
   }
 
@@ -798,22 +865,13 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
 
     final otp = _otpController.text.trim();
     if (otp.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter the verification code'),
-          backgroundColor: AppColors.errorRed,
-        ),
-      );
+      _showTopSnackBar(
+          'Please enter the verification code', AppColors.errorRed);
       return;
     }
 
     if (otp.length != 6) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter all 6 digits'),
-          backgroundColor: AppColors.errorRed,
-        ),
-      );
+      _showTopSnackBar('Please enter all 6 digits', AppColors.errorRed);
       return;
     }
 
@@ -832,20 +890,11 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
       });
 
       if (success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Email verified successfully!'),
-            backgroundColor: AppColors.successGreen,
-          ),
-        );
+        _showTopSnackBar(
+            'Email verified successfully!', AppColors.successGreen);
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content:
-                Text('Verification failed, but proceeding for development'),
-            backgroundColor: AppColors.warningOrange,
-          ),
-        );
+        _showTopSnackBar('Verification failed, but proceeding for development',
+            AppColors.warningOrange);
       }
 
       // Proceed to next step regardless of verification result (for development)
@@ -855,12 +904,8 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
       setState(() {
         _isOtpSubmitting = false;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Error occurred, but proceeding for development'),
-          backgroundColor: AppColors.warningOrange,
-        ),
-      );
+      _showTopSnackBar('Error occurred, but proceeding for development',
+          AppColors.warningOrange);
 
       // Proceed to next step even on error (for development)
       _nextStep();
@@ -1817,12 +1862,8 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
         // Check file size (max 10MB)
         if (fileSize > 10 * 1024 * 1024) {
           if (!mounted) return;
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('File size must be less than 10MB'),
-              backgroundColor: AppColors.errorRed,
-            ),
-          );
+          _showTopSnackBar(
+              'File size must be less than 10MB', AppColors.errorRed);
           return;
         }
 
@@ -1834,21 +1875,13 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
 
         if (!mounted) return;
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Document captured successfully!'),
-            backgroundColor: AppColors.successGreen,
-          ),
-        );
+        _showTopSnackBar(
+            'Document captured successfully!', AppColors.successGreen);
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error capturing image: ${e.toString()}'),
-          backgroundColor: AppColors.errorRed,
-        ),
-      );
+      _showTopSnackBar(
+          'Error capturing image: ${e.toString()}', AppColors.errorRed);
     }
   }
 
@@ -1885,21 +1918,13 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
 
         if (!mounted) return;
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Document selected successfully!'),
-            backgroundColor: AppColors.successGreen,
-          ),
-        );
+        _showTopSnackBar(
+            'Document selected successfully!', AppColors.successGreen);
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error selecting image: ${e.toString()}'),
-          backgroundColor: AppColors.errorRed,
-        ),
-      );
+      _showTopSnackBar(
+          'Error selecting image: ${e.toString()}', AppColors.errorRed);
     }
   }
 
@@ -1934,21 +1959,13 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
 
         if (!mounted) return;
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Document uploaded successfully!'),
-            backgroundColor: AppColors.successGreen,
-          ),
-        );
+        _showTopSnackBar(
+            'Document uploaded successfully!', AppColors.successGreen);
       }
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error selecting PDF: ${e.toString()}'),
-          backgroundColor: AppColors.errorRed,
-        ),
-      );
+      _showTopSnackBar(
+          'Error selecting PDF: ${e.toString()}', AppColors.errorRed);
     }
   }
 
@@ -2089,27 +2106,28 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
       });
 
       // Show success snackbar (preview is already visible on the page)
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Selfie verified successfully!'),
-          backgroundColor: AppColors.successGreen,
-          duration: Duration(seconds: 2),
-        ),
-      );
+      _showTopSnackBar('Selfie verified successfully!', AppColors.successGreen);
     } catch (e) {
       if (!mounted) return;
       _showError('Error processing selfie: ${e.toString()}');
     }
   }
 
-  void _showError(String message) {
+  void _showTopSnackBar(String message, Color color) {
+    final height = MediaQuery.of(context).size.height;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: AppColors.errorRed,
-        duration: const Duration(seconds: 4),
+        backgroundColor: color,
+        duration: const Duration(seconds: 3),
+        behavior: SnackBarBehavior.floating,
+        margin: EdgeInsets.only(bottom: height - 140, left: 16, right: 16),
       ),
     );
+  }
+
+  void _showError(String message) {
+    _showTopSnackBar(message, AppColors.errorRed);
   }
 
   Widget _buildDocumentPreview(String label, String path, File file) {
@@ -2220,12 +2238,7 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
       print('Error fetching countries: $e');
 
       // Show error message to user
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to load countries: $e'),
-          backgroundColor: AppColors.errorRed,
-        ),
-      );
+      _showTopSnackBar('Failed to load countries: $e', AppColors.errorRed);
     }
   }
 
@@ -2305,7 +2318,7 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
         email: _emailController.text.trim(),
         password: _passwordController.text,
         dateOfBirth: formattedDob,
-        phone: _phoneController.text.trim(),
+        phone: '$_countryCode${_phoneController.text.trim()}',
         otp: '000000', // Fixed OTP as per requirement
         countryId: _selectedCountry!.id,
         documentType: _getDocumentTypeForApi(),
@@ -2319,44 +2332,11 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
       Navigator.of(context).pop();
 
       if (response.success) {
-        // Show success dialog
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (context) => AlertDialog(
-            backgroundColor: AppColors.cardBackground,
-            title: const Row(
-              children: [
-                Icon(Icons.check_circle,
-                    color: AppColors.successGreen, size: 32),
-                SizedBox(width: 12),
-                Text(
-                  'Success!',
-                  style: TextStyle(color: AppColors.successGreen),
-                ),
-              ],
-            ),
-            content: Text(
-              response.message ??
-                  'Your account has been created successfully. Please log in to continue.',
-              style: const TextStyle(color: AppColors.whiteText),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.of(context).pop(); // Close dialog
-                  Navigator.of(context).pop(); // Go back to login page
-                },
-                child: const Text(
-                  'Go to Login',
-                  style: TextStyle(
-                      color: AppColors.primaryGold,
-                      fontWeight: FontWeight.bold),
-                ),
-              ),
-            ],
-          ),
-        );
+        // Reset form fields
+        _resetForm();
+
+        // Navigate to login page and return true to indicate success
+        Navigator.of(context).pop(true);
       } else {
         // Handle validation errors
         if (response.errors != null && response.errors!.isNotEmpty) {
@@ -2409,7 +2389,10 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
               ),
               actions: [
                 TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    _resetForm();
+                  },
                   child: const Text(
                     'OK',
                     style: TextStyle(color: AppColors.primaryGold),
@@ -2419,9 +2402,40 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
             ),
           );
         } else {
-          // Show general error message
-          _showError(
-              response.message ?? 'Registration failed. Please try again.');
+          // Show general error message in a Dialog
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              backgroundColor: AppColors.cardBackground,
+              title: const Row(
+                children: [
+                  Icon(Icons.error_outline,
+                      color: AppColors.errorRed, size: 32),
+                  SizedBox(width: 12),
+                  Text(
+                    'Error',
+                    style: TextStyle(color: AppColors.errorRed),
+                  ),
+                ],
+              ),
+              content: Text(
+                response.message ?? 'Registration failed. Please try again.',
+                style: const TextStyle(color: AppColors.whiteText),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    _resetForm();
+                  },
+                  child: const Text(
+                    'OK',
+                    style: TextStyle(color: AppColors.primaryGold),
+                  ),
+                ),
+              ],
+            ),
+          );
         }
       }
     } catch (e) {
@@ -2431,6 +2445,35 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
       Navigator.of(context).pop();
 
       _showError('An error occurred: ${e.toString()}');
+    }
+  }
+
+  void _resetForm() {
+    _firstNameController.clear();
+    _lastNameController.clear();
+    _emailController.clear();
+    _phoneController.clear();
+    _passwordController.clear();
+    _confirmPasswordController.clear();
+    _dobController.clear();
+    _otpController.clear();
+
+    setState(() {
+      _documentFile = null;
+      _documentPath = null;
+      _documentsUploaded = false;
+      _selfieFile = null;
+      _selfiePath = null;
+      _selfieCompleted = false;
+      _termsAccepted = false;
+      _currentStep = 0;
+      _selectedCountry = null;
+      _countryCode = '+1';
+    });
+
+    // Reset page controller to first page
+    if (_pageController.hasClients) {
+      _pageController.jumpToPage(0);
     }
   }
 
