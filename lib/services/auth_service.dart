@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ouro_pay_consumer_app/config/app_config.dart';
 import 'package:ouro_pay_consumer_app/models/user.dart';
 import 'package:ouro_pay_consumer_app/models/country.dart';
+import 'package:ouro_pay_consumer_app/models/user_profile.dart';
 
 /// Response model for login
 class LoginResponse {
@@ -480,12 +481,17 @@ class AuthService {
   /// Get stored authentication token
   Future<String?> getToken() async {
     final prefs = await _prefs;
-    return prefs.getString(_tokenKey);
+    final token = prefs.getString(_tokenKey);
+    if (token != null) {
+      print('🔑 Retrieved Token: $token');
+    }
+    return token;
   }
 
   /// Save authentication token
   Future<void> saveToken(String token) async {
     final prefs = await _prefs;
+    print('🔑 Saving Token: $token');
     await prefs.setString(_tokenKey, token);
   }
 
@@ -778,6 +784,89 @@ class AuthService {
       print('═══════════════════════════════════════════════════════════');
       print('');
       return [];
+    }
+  }
+
+  /// Get user profile with KYC status and permissions
+  ///
+  /// Makes a GET request to {{base_url}}/user/profile
+  /// Requires authentication token in header
+  Future<UserProfileResponse> getUserProfile() async {
+    try {
+      final url = Uri.parse('$_baseUrl/user/profile');
+      final token = await getToken();
+
+      print('');
+      print('═══════════════════════════════════════════════════════════');
+      print('🔵 GET USER PROFILE API CALL');
+      print('═══════════════════════════════════════════════════════════');
+      print('📍 API Endpoint: $url');
+      print('🔑 Authorization: Bearer ${token != null ? "***" : "null"}');
+      print('───────────────────────────────────────────────────────────');
+
+      if (token == null) {
+        print('❌ Failed: No authentication token found');
+        print('═══════════════════════════════════════════════════════════');
+        print('');
+        return UserProfileResponse(
+          success: false,
+          message: 'Authentication required',
+        );
+      }
+
+      final response = await http.get(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(
+        AppConfig.connectionTimeout,
+        onTimeout: () {
+          throw Exception(
+              'Connection timeout. Please check your internet connection.');
+        },
+      );
+
+      print('📥 Response Status Code: ${response.statusCode}');
+      print('📥 Response Body: ${response.body}');
+
+      if (response.statusCode == 200) {
+        final responseData = jsonDecode(response.body);
+        final profileResponse = UserProfileResponse.fromJson(responseData);
+
+        if (profileResponse.data != null) {
+          print('✅ Success: Profile retrieved');
+          print('   User: ${profileResponse.data!.name}');
+          print('   Email: ${profileResponse.data!.email}');
+          print(
+              '   KYC Status: ${profileResponse.data!.authorization.kycStatus.status}');
+          print(
+              '   Is Active: ${profileResponse.data!.authorization.isActive}');
+        }
+        print('═══════════════════════════════════════════════════════════');
+        print('');
+
+        return profileResponse;
+      } else {
+        final responseData = jsonDecode(response.body);
+        print('❌ Failed: Status ${response.statusCode}');
+        print('═══════════════════════════════════════════════════════════');
+        print('');
+        return UserProfileResponse(
+          success: false,
+          message: responseData['message'] ?? 'Failed to get profile',
+        );
+      }
+    } catch (e) {
+      print('❌ Get User Profile Error: $e');
+      print('═══════════════════════════════════════════════════════════');
+      print('');
+      return UserProfileResponse(
+        success: false,
+        message: 'An error occurred while fetching profile',
+      );
     }
   }
 }

@@ -2403,39 +2403,8 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
           );
         } else {
           // Show general error message in a Dialog
-          showDialog(
-            context: context,
-            builder: (context) => AlertDialog(
-              backgroundColor: AppColors.cardBackground,
-              title: const Row(
-                children: [
-                  Icon(Icons.error_outline,
-                      color: AppColors.errorRed, size: 32),
-                  SizedBox(width: 12),
-                  Text(
-                    'Error',
-                    style: TextStyle(color: AppColors.errorRed),
-                  ),
-                ],
-              ),
-              content: Text(
-                response.message ?? 'Registration failed. Please try again.',
-                style: const TextStyle(color: AppColors.whiteText),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                    _resetForm();
-                  },
-                  child: const Text(
-                    'OK',
-                    style: TextStyle(color: AppColors.primaryGold),
-                  ),
-                ),
-              ],
-            ),
-          );
+          _showErrorDialog('Error',
+              response.message ?? 'Registration failed. Please try again.');
         }
       }
     } catch (e) {
@@ -2444,8 +2413,44 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
       // Close loading dialog
       Navigator.of(context).pop();
 
-      _showError('An error occurred: ${e.toString()}');
+      _showErrorDialog('Error', 'An error occurred: ${e.toString()}');
     }
+  }
+
+  void _showErrorDialog(String title, String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.cardBackground,
+        title: Row(
+          children: [
+            const Icon(Icons.error_outline,
+                color: AppColors.errorRed, size: 32),
+            const SizedBox(width: 12),
+            Text(
+              title,
+              style: const TextStyle(color: AppColors.errorRed),
+            ),
+          ],
+        ),
+        content: Text(
+          message,
+          style: const TextStyle(color: AppColors.whiteText),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              Navigator.of(context).pop();
+              _resetForm();
+            },
+            child: const Text(
+              'OK',
+              style: TextStyle(color: AppColors.primaryGold),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   void _resetForm() {

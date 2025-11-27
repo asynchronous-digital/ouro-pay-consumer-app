@@ -3,6 +3,7 @@ import 'package:ouro_pay_consumer_app/theme/app_theme.dart';
 import 'package:ouro_pay_consumer_app/models/deposit.dart';
 import 'package:ouro_pay_consumer_app/services/deposit_service.dart';
 import 'package:ouro_pay_consumer_app/pages/deposit_history_page.dart';
+import 'package:flutter_stripe/flutter_stripe.dart' hide Card;
 
 class AddMoneyPage extends StatefulWidget {
   const AddMoneyPage({super.key});
@@ -55,40 +56,122 @@ class _AddMoneyPageState extends State<AddMoneyPage> {
     });
 
     try {
+      // Map payment method to backend expected values
+      String backendPaymentMethod = _selectedPaymentMethod;
+      if (_selectedPaymentMethod == 'credit_card' ||
+          _selectedPaymentMethod == 'debit_card') {
+        backendPaymentMethod = 'card';
+      }
+
       final request = DepositRequest(
         currencyCode: _selectedCurrency,
         amount: amount,
-        paymentMethod: _selectedPaymentMethod,
+        paymentMethod: backendPaymentMethod,
         notes: _notesController.text.trim(),
       );
 
       final response = await _depositService.createDeposit(request);
 
       if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
+        if (response.success) {
+          // Check if we have a client secret for Stripe payment
+          if (response.clientSecret != null &&
+              response.clientSecret!.isNotEmpty) {
+            print(
+                '🔵 Stripe: client_secret received: ${response.clientSecret}');
+            try {
+              print('🔵 Stripe: Initializing Payment Sheet...');
+              // Initialize and present Payment Sheet
+              await Stripe.instance.initPaymentSheet(
+                paymentSheetParameters: SetupPaymentSheetParameters(
+                  paymentIntentClientSecret: response.clientSecret!,
+                  merchantDisplayName: 'Ouro Pay',
+                  style: ThemeMode.dark,
+                  appearance: const PaymentSheetAppearance(
+                    colors: PaymentSheetAppearanceColors(
+                      primary: AppColors.primaryGold,
+                    ),
+                  ),
+                ),
+              );
 
-        if (response.success && response.data != null) {
-          // Show success message
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(response.message),
-              backgroundColor: AppColors.successGreen,
-            ),
-          );
+              print('🔵 Stripe: Payment Sheet initialized, presenting...');
+              await Stripe.instance.presentPaymentSheet();
 
-          // Navigate to deposit history
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => DepositHistoryPage(
-                currency: _selectedCurrency,
+              print('🔵 Stripe: Payment Sheet completed successfully');
+              if (mounted) {
+                setState(() {
+                  _isLoading = false;
+                });
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Payment successful!'),
+                    backgroundColor: AppColors.successGreen,
+                  ),
+                );
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => DepositHistoryPage(
+                      currency: _selectedCurrency,
+                    ),
+                  ),
+                );
+              }
+            } on StripeException catch (e) {
+              print(
+                  '🔴 Stripe Exception: ${e.error.code} - ${e.error.message}');
+              if (mounted) {
+                setState(() {
+                  _isLoading = false;
+                });
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content:
+                        Text('Payment failed: ${e.error.localizedMessage}'),
+                    backgroundColor: AppColors.errorRed,
+                  ),
+                );
+              }
+            } catch (e) {
+              print('🔴 General Error: $e');
+              if (mounted) {
+                setState(() {
+                  _isLoading = false;
+                });
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Error: $e'),
+                    backgroundColor: AppColors.errorRed,
+                  ),
+                );
+              }
+            }
+          } else {
+            // Normal success (e.g. Bank Transfer)
+            setState(() {
+              _isLoading = false;
+            });
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(response.message),
+                backgroundColor: AppColors.successGreen,
               ),
-            ),
-          );
+            );
+
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => DepositHistoryPage(
+                  currency: _selectedCurrency,
+                ),
+              ),
+            );
+          }
         } else {
-          // Show error message
+          setState(() {
+            _isLoading = false;
+          });
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(response.message),

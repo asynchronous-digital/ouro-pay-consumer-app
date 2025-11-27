@@ -14,6 +14,8 @@ import 'package:ouro_pay_consumer_app/pages/deposit_history_page.dart';
 import 'package:ouro_pay_consumer_app/utils/debug_prefs.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:flutter/services.dart';
+import 'package:ouro_pay_consumer_app/models/user_profile.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -34,6 +36,8 @@ class _DashboardPageState extends State<DashboardPage>
   bool _isLoadingGoldPrice = false; // Loading state for gold price
   GoldPriceData? _goldPriceData; // Current gold price data
   String _selectedCurrency = 'USD'; // Currently selected currency for price
+  UserProfile? _userProfile; // User profile with KYC status and permissions
+  bool _isLoadingProfile = false; // Loading state for user profile
 
   @override
   void initState() {
@@ -41,6 +45,7 @@ class _DashboardPageState extends State<DashboardPage>
     _tabController = TabController(length: 3, vsync: this);
     _portfolio = UserPortfolio.createDefault(
         'user_123'); // Will be updated when user loads
+    _loadUserProfile(); // Load user profile first to get KYC status
     _loadUserData();
     _loadGoldPrice(); // Load gold price for EUR by default
   }
@@ -291,9 +296,48 @@ class _DashboardPageState extends State<DashboardPage>
     }
   }
 
+  Future<void> _loadUserProfile() async {
+    setState(() {
+      _isLoadingProfile = true;
+    });
+
+    try {
+      print('👤 Dashboard: Loading user profile');
+      final authService = AuthService();
+      final response = await authService.getUserProfile();
+
+      if (mounted) {
+        if (response.success && response.data != null) {
+          setState(() {
+            _userProfile = response.data;
+            _isLoadingProfile = false;
+          });
+          print(
+              '  ✅ Dashboard: User profile loaded - KYC status: ${_userProfile!.authorization.kycStatus.status}');
+        } else {
+          print(
+              '  ⚠️ Dashboard: Failed to load user profile - ${response.message}');
+          setState(() {
+            _userProfile = null;
+            _isLoadingProfile = false;
+          });
+        }
+      }
+    } catch (e) {
+      print('  ❌ Dashboard: Error loading user profile: $e');
+      if (mounted) {
+        setState(() {
+          _userProfile = null;
+          _isLoadingProfile = false;
+        });
+      }
+    }
+  }
+
   Future<void> _refreshData() async {
     // Refresh all data
     await Future.wait([
+      _loadUserProfile(),
       _loadUserData(),
       _loadWalletData(),
       _loadGoldHoldings(),
@@ -712,7 +756,8 @@ class _DashboardPageState extends State<DashboardPage>
                 child: _buildActionButton(
                   icon: Icons.add,
                   label: 'Add Money',
-                  onPressed: _showAddMoneyDialog,
+                  onPressed: _handleAddMoney,
+                  isEnabled: _isKycApproved,
                 ),
               ),
               const SizedBox(width: 12),
@@ -720,9 +765,8 @@ class _DashboardPageState extends State<DashboardPage>
                 child: _buildActionButton(
                   icon: Icons.swap_horiz,
                   label: 'Transfer',
-                  onPressed: () {
-                    Navigator.pushNamed(context, '/conversion');
-                  },
+                  onPressed: _handleTransfer,
+                  isEnabled: _isKycApproved,
                 ),
               ),
             ],
@@ -1104,13 +1148,9 @@ class _DashboardPageState extends State<DashboardPage>
                 child: _buildActionButton(
                   icon: Icons.swap_horiz,
                   label: 'Trade Gold',
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const TradeGoldPage()),
-                    );
-                  },
+                  onPressed: _handleTradeGold,
                   backgroundColor: AppColors.primaryGold,
+                  isEnabled: _isKycApproved,
                 ),
               ),
               const SizedBox(width: 12),
@@ -1119,14 +1159,9 @@ class _DashboardPageState extends State<DashboardPage>
                 child: _buildActionButton(
                   icon: Icons.list_alt,
                   label: 'Transactions',
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (_) => const GoldTransactionsPage()),
-                    );
-                  },
+                  onPressed: _handleGoldTransactions,
                   backgroundColor: AppColors.secondaryGold,
+                  isEnabled: _isKycApproved,
                 ),
               ),
             ],
@@ -1581,6 +1616,65 @@ class _DashboardPageState extends State<DashboardPage>
     );
   }
 
+  /// Check if KYC is approved
+  bool get _isKycApproved {
+    return _userProfile?.authorization.kycStatus.isApproved ?? false;
+  }
+
+  /// Show KYC verification toast message
+  void _showKycVerificationMessage() {
+    Fluttertoast.showToast(
+      msg: "Waiting for your account verification",
+      toastLength: Toast.LENGTH_LONG,
+      gravity: ToastGravity.BOTTOM,
+      backgroundColor: AppColors.cardBackground,
+      textColor: AppColors.whiteText,
+      fontSize: 16.0,
+    );
+  }
+
+  /// Handle Add Money button press
+  void _handleAddMoney() {
+    if (_isKycApproved) {
+      _showAddMoneyDialog();
+    } else {
+      _showKycVerificationMessage();
+    }
+  }
+
+  /// Handle Transfer button press
+  void _handleTransfer() {
+    if (_isKycApproved) {
+      Navigator.pushNamed(context, '/conversion');
+    } else {
+      _showKycVerificationMessage();
+    }
+  }
+
+  /// Handle Trade Gold button press
+  void _handleTradeGold() {
+    if (_isKycApproved) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const TradeGoldPage()),
+      );
+    } else {
+      _showKycVerificationMessage();
+    }
+  }
+
+  /// Handle Gold Transactions button press
+  void _handleGoldTransactions() {
+    if (_isKycApproved) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const GoldTransactionsPage()),
+      );
+    } else {
+      _showKycVerificationMessage();
+    }
+  }
+
   Widget _buildActionButton({
     required IconData icon,
     required String label,
@@ -1588,6 +1682,7 @@ class _DashboardPageState extends State<DashboardPage>
     Color? backgroundColor,
     Color? textColor,
     bool isFullWidth = false,
+    bool isEnabled = true,
   }) {
     return SizedBox(
       width: isFullWidth ? double.infinity : null,
@@ -1596,8 +1691,12 @@ class _DashboardPageState extends State<DashboardPage>
         icon: Icon(icon, size: 20),
         label: Text(label),
         style: ElevatedButton.styleFrom(
-          backgroundColor: backgroundColor ?? AppColors.primaryGold,
-          foregroundColor: textColor ?? AppColors.darkBackground,
+          backgroundColor: isEnabled
+              ? (backgroundColor ?? AppColors.primaryGold)
+              : AppColors.greyText.withOpacity(0.3),
+          foregroundColor: isEnabled
+              ? (textColor ?? AppColors.darkBackground)
+              : AppColors.greyText,
           padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
         ),
       ),
@@ -1640,7 +1739,6 @@ class _DashboardPageState extends State<DashboardPage>
                   style: TextStyle(color: AppColors.whiteText)),
               onTap: () => _showComingSoon(),
             ),
-
             const Divider(color: AppColors.greyText),
             ListTile(
               leading: const Icon(Icons.logout, color: AppColors.errorRed),

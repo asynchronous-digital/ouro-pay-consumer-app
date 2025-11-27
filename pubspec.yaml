@@ -63,6 +63,10 @@ dependencies:
   
   # Country code picker for phone numbers
   country_code_picker: ^3.0.0
+  flutter_stripe: ^12.1.1
+  
+  # Toast messages for notifications
+  fluttertoast: ^8.2.4
 
 dev_dependencies:
   flutter_test:
