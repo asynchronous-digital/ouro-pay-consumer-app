@@ -517,7 +517,7 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
     final result = await Navigator.of(context).pushNamed('/signup');
     if (result == true) {
       if (!mounted) return;
-      final height = MediaQuery.of(context).size.height;
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Row(
@@ -535,7 +535,7 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
           backgroundColor: AppColors.cardBackground,
           duration: const Duration(seconds: 5),
           behavior: SnackBarBehavior.floating,
-          margin: EdgeInsets.only(bottom: height - 140, left: 16, right: 16),
+          margin: const EdgeInsets.all(16),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
             side: const BorderSide(color: AppColors.successGreen, width: 2),

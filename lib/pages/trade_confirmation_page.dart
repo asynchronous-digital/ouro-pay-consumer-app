@@ -253,7 +253,8 @@ class _TradeConfirmationPageState extends State<TradeConfirmationPage> {
                 onPressed: () {
                   Navigator.of(context).pop(); // Close dialog
                   // Pop back to dashboard with success flag
-                  Navigator.of(context).popUntil((route) => route.isFirst);
+                  Navigator.pushNamedAndRemoveUntil(
+                      context, '/dashboard', (route) => false);
                 },
                 child: const Text('OK',
                     style: TextStyle(color: AppColors.whiteText)),

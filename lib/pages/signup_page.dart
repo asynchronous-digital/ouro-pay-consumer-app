@@ -703,11 +703,11 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
 
       if (success) {
         // Show success message at top and proceed to next step
-        _showTopSnackBar('OTP sent successfully. Please check your email.',
+        _showBottomSnackBar('OTP sent successfully. Please check your email.',
             AppColors.successGreen);
         _nextStep();
       } else {
-        _showTopSnackBar(
+        _showBottomSnackBar(
             'Failed to send OTP. Please try again.', AppColors.errorRed);
       }
     } catch (e) {
@@ -715,7 +715,7 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
       setState(() {
         _isStepOneSubmitting = false;
       });
-      _showTopSnackBar('An error occurred: $e', AppColors.errorRed);
+      _showBottomSnackBar('An error occurred: $e', AppColors.errorRed);
     }
   }
 
@@ -886,13 +886,12 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
 
     final otp = _otpController.text.trim();
     if (otp.isEmpty) {
-      _showTopSnackBar(
-          'Please enter the verification code', AppColors.errorRed);
+      _showBottomSnackBar('Please enter your email first', AppColors.errorRed);
       return;
     }
 
     if (otp.length != 6) {
-      _showTopSnackBar('Please enter all 6 digits', AppColors.errorRed);
+      _showBottomSnackBar('Please enter all 6 digits', AppColors.errorRed);
       return;
     }
 
@@ -911,10 +910,11 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
       });
 
       if (success) {
-        _showTopSnackBar(
-            'Email verified successfully!', AppColors.successGreen);
+        _showBottomSnackBar(
+            'OTP verified successfully!', AppColors.successGreen);
       } else {
-        _showTopSnackBar('Verification failed, but proceeding for development',
+        _showBottomSnackBar(
+            'Verification failed, but proceeding for development',
             AppColors.warningOrange);
       }
 
@@ -925,7 +925,7 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
       setState(() {
         _isOtpSubmitting = false;
       });
-      _showTopSnackBar('Error occurred, but proceeding for development',
+      _showBottomSnackBar('Error occurred, but proceeding for development',
           AppColors.warningOrange);
 
       // Proceed to next step even on error (for development)
@@ -1906,7 +1906,7 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
 
         if (compressedFile == null) {
           if (!mounted) return;
-          _showTopSnackBar('Failed to process image', AppColors.errorRed);
+          _showBottomSnackBar('Failed to process image', AppColors.errorRed);
           return;
         }
 
@@ -1915,7 +1915,7 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
         // Check file size (max 2MB)
         if (fileSize > 2 * 1024 * 1024) {
           if (!mounted) return;
-          _showTopSnackBar(
+          _showBottomSnackBar(
               'File size must be less than 2MB', AppColors.errorRed);
           return;
         }
@@ -1928,12 +1928,12 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
 
         if (!mounted) return;
 
-        _showTopSnackBar(
+        _showBottomSnackBar(
             'Document captured successfully!', AppColors.successGreen);
       }
     } catch (e) {
       if (!mounted) return;
-      _showTopSnackBar(
+      _showBottomSnackBar(
           'Error capturing image: ${e.toString()}', AppColors.errorRed);
     }
   }
@@ -1984,12 +1984,12 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
 
         if (!mounted) return;
 
-        _showTopSnackBar(
+        _showBottomSnackBar(
             'Document selected successfully!', AppColors.successGreen);
       }
     } catch (e) {
       if (!mounted) return;
-      _showTopSnackBar(
+      _showBottomSnackBar(
           'Error selecting image: ${e.toString()}', AppColors.errorRed);
     }
   }
@@ -2025,12 +2025,12 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
 
         if (!mounted) return;
 
-        _showTopSnackBar(
+        _showBottomSnackBar(
             'Document uploaded successfully!', AppColors.successGreen);
       }
     } catch (e) {
       if (!mounted) return;
-      _showTopSnackBar(
+      _showBottomSnackBar(
           'Error selecting PDF: ${e.toString()}', AppColors.errorRed);
     }
   }
@@ -2224,28 +2224,28 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
       });
 
       // Show success snackbar (preview is already visible on the page)
-      _showTopSnackBar('Selfie verified successfully!', AppColors.successGreen);
+      _showBottomSnackBar(
+          'Selfie verified successfully!', AppColors.successGreen);
     } catch (e) {
       if (!mounted) return;
       _showError('Error processing selfie: ${e.toString()}');
     }
   }
 
-  void _showTopSnackBar(String message, Color color) {
-    final height = MediaQuery.of(context).size.height;
+  void _showBottomSnackBar(String message, Color color) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
         backgroundColor: color,
         duration: const Duration(seconds: 3),
         behavior: SnackBarBehavior.floating,
-        margin: EdgeInsets.only(bottom: height - 140, left: 16, right: 16),
+        margin: const EdgeInsets.all(16),
       ),
     );
   }
 
   void _showError(String message) {
-    _showTopSnackBar(message, AppColors.errorRed);
+    _showBottomSnackBar(message, AppColors.errorRed);
   }
 
   Widget _buildDocumentPreview(String label, String path, File file) {
@@ -2356,7 +2356,7 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
       print('Error fetching countries: $e');
 
       // Show error message to user
-      _showTopSnackBar('Failed to load countries: $e', AppColors.errorRed);
+      _showBottomSnackBar('Failed to load countries: $e', AppColors.errorRed);
     }
   }
 

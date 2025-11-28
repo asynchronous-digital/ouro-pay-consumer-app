@@ -276,8 +276,8 @@ class _ConversionPageState extends State<ConversionPage> {
           TextButton(
             onPressed: () {
               Navigator.pop(context); // Close dialog
-              Navigator.of(context)
-                  .popUntil((route) => route.isFirst); // Go back to dashboard
+              Navigator.pushNamedAndRemoveUntil(context, '/dashboard',
+                  (route) => false); // Go back to dashboard
             },
             child: const Text(
               'OK',
