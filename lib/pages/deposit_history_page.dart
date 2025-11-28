@@ -264,7 +264,9 @@ class _DepositHistoryPageState extends State<DepositHistoryPage> {
             _buildDetailRow('Payment Method', deposit.paymentMethod),
             if (deposit.fee > 0) ...[
               const SizedBox(height: 4),
-              _buildDetailRow('Fee', '${deposit.formattedNetAmount}'),
+              _buildDetailRow('Fee', deposit.formattedFee),
+              const SizedBox(height: 4),
+              _buildDetailRow('Net Amount', deposit.formattedNetAmount),
             ],
             if (deposit.notes != null && deposit.notes!.isNotEmpty) ...[
               const SizedBox(height: 4),

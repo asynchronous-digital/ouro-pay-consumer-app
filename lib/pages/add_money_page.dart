@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:ouro_pay_consumer_app/theme/app_theme.dart';
 import 'package:ouro_pay_consumer_app/models/deposit.dart';
 import 'package:ouro_pay_consumer_app/services/deposit_service.dart';
-import 'package:ouro_pay_consumer_app/pages/deposit_history_page.dart';
 import 'package:flutter_stripe/flutter_stripe.dart' hide Card;
 
 class AddMoneyPage extends StatefulWidget {
@@ -109,14 +108,8 @@ class _AddMoneyPageState extends State<AddMoneyPage> {
                     backgroundColor: AppColors.successGreen,
                   ),
                 );
-                Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => DepositHistoryPage(
-                      currency: _selectedCurrency,
-                    ),
-                  ),
-                );
+                // Return to dashboard with success flag
+                Navigator.pop(context, true);
               }
             } on StripeException catch (e) {
               print(
@@ -159,14 +152,8 @@ class _AddMoneyPageState extends State<AddMoneyPage> {
               ),
             );
 
-            Navigator.pushReplacement(
-              context,
-              MaterialPageRoute(
-                builder: (context) => DepositHistoryPage(
-                  currency: _selectedCurrency,
-                ),
-              ),
-            );
+            // Return to dashboard with success flag
+            Navigator.pop(context, true);
           }
         } else {
           setState(() {

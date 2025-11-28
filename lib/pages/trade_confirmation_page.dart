@@ -180,27 +180,46 @@ class _TradeConfirmationPageState extends State<TradeConfirmationPage> {
       return;
     }
 
+    // Step 1: Show loading indicator first to prevent blank screen
     setState(() => _isLoading = true);
+
+    // Step 2: Dismiss keyboard after loading indicator is shown
+    FocusScope.of(context).unfocus();
+
+    // Step 3: Make API call
     final service = GoldService();
     final resp = widget.isBuy
         ? await service.buyGold(currency: _selectedCurrency, grams: grams)
         : await service.sellGold(currency: _selectedCurrency, grams: grams);
 
     if (mounted) {
-      setState(() => _isLoading = false);
+      // Step 4: Show dialog
       if (resp.success) {
-        if (widget.isBuy) {
-          await _fetchBalance();
-        }
-        await _fetchHoldings();
+        // Temporarily fetch holdings to show in dialog, but don't update UI yet
+        final tempHoldings = await _fetchHoldings();
 
         if (!mounted) return;
 
-        showDialog(
+        // Stop loading just before showing dialog (prevents flash of underlying page)
+        setState(() => _isLoading = false);
+
+        // Show success dialog
+        await showDialog(
           context: context,
           barrierDismissible: false,
           builder: (_) => AlertDialog(
-            title: const Text('Success'),
+            backgroundColor: AppColors.cardBackground,
+            title: const Row(
+              children: [
+                Icon(Icons.check_circle,
+                    color: AppColors.successGreen, size: 32),
+                SizedBox(width: 12),
+                Text(
+                  'Success',
+                  style: TextStyle(color: AppColors.whiteText),
+                ),
+              ],
+            ),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -211,7 +230,7 @@ class _TradeConfirmationPageState extends State<TradeConfirmationPage> {
                 ),
                 const SizedBox(height: 16),
                 Text(
-                  'Your new gold balance: ${_availableGoldHoldings.toStringAsFixed(3)}g',
+                  'Your new gold balance: ${tempHoldings.toStringAsFixed(3)}g',
                   style: const TextStyle(
                       color: AppColors.primaryGold,
                       fontWeight: FontWeight.bold),
@@ -233,7 +252,8 @@ class _TradeConfirmationPageState extends State<TradeConfirmationPage> {
               TextButton(
                 onPressed: () {
                   Navigator.of(context).pop(); // Close dialog
-                  Navigator.of(context).pop(true); // Return to previous screen
+                  // Pop back to dashboard with success flag
+                  Navigator.of(context).popUntil((route) => route.isFirst);
                 },
                 child: const Text('OK',
                     style: TextStyle(color: AppColors.whiteText)),
@@ -241,7 +261,19 @@ class _TradeConfirmationPageState extends State<TradeConfirmationPage> {
             ],
           ),
         );
+
+        // Step 5: After dialog closes (if not already navigated to dashboard)
+        // The dialog's OK button now handles navigation to dashboard
+        // Only pop if user clicked "View Transactions" instead of "OK"
+        if (!mounted) return;
+
+        // This will only execute if the dialog was closed by "View Transactions" button
+        // The OK button navigates directly to dashboard in its onPressed handler
       } else {
+        // Stop loading for error case
+        setState(() => _isLoading = false);
+
+        // Show error message
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(resp.message ?? 'Transaction failed'),
