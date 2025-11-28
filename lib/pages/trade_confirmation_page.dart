@@ -385,206 +385,213 @@ class _TradeConfirmationPageState extends State<TradeConfirmationPage> {
         ],
       ),
       backgroundColor: AppColors.darkBackground,
-      body: Padding(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Enter Amount',
-              style: TextStyle(
-                color: AppColors.greyText,
-                fontSize: 16,
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _gramsController,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
-              inputFormatters: [
-                FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,3}')),
-                if (!widget.isBuy) MaxAmountFormatter(_availableGoldHoldings),
-              ],
-              style: const TextStyle(color: AppColors.whiteText, fontSize: 24),
-              decoration: InputDecoration(
-                suffixText: 'grams',
-                suffixStyle: const TextStyle(color: AppColors.primaryGold),
-                enabledBorder: OutlineInputBorder(
-                  borderSide: BorderSide(
-                      color: AppColors.greyText.withValues(alpha: 0.3)),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderSide: const BorderSide(color: AppColors.primaryGold),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-            ),
-            const SizedBox(height: 32),
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: AppColors.cardBackground,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                    color: AppColors.greyText.withValues(alpha: 0.1)),
-              ),
+      body: CustomScrollView(
+        slivers: [
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('Price per gram',
-                          style: TextStyle(color: AppColors.greyText)),
-                      _isPriceLoading
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2))
-                          : Text(
-                              '${_currentPricePerGram.toStringAsFixed(2)} $_selectedCurrency',
-                              style: const TextStyle(
-                                  color: AppColors.whiteText,
-                                  fontWeight: FontWeight.bold),
-                            ),
+                  Text(
+                    'Enter Amount',
+                    style: TextStyle(
+                      color: AppColors.greyText,
+                      fontSize: 16,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _gramsController,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,3}')),
+                      if (!widget.isBuy) MaxAmountFormatter(_availableGoldHoldings),
                     ],
+                    style: const TextStyle(color: AppColors.whiteText, fontSize: 24),
+                    decoration: InputDecoration(
+                      suffixText: 'grams',
+                      suffixStyle: const TextStyle(color: AppColors.primaryGold),
+                      enabledBorder: OutlineInputBorder(
+                        borderSide: BorderSide(
+                            color: AppColors.greyText.withValues(alpha: 0.3)),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderSide: const BorderSide(color: AppColors.primaryGold),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
                   ),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 16),
-                    child: Divider(color: AppColors.greyText),
-                  ),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text('Total Value',
-                          style: TextStyle(
-                              color: AppColors.whiteText, fontSize: 18)),
-                      _isPriceLoading
-                          ? const SizedBox(
-                              width: 24,
-                              height: 24,
-                              child: CircularProgressIndicator(strokeWidth: 2))
-                          : Text(
-                              '${_totalValue.toStringAsFixed(2)} $_selectedCurrency',
-                              style: TextStyle(
-                                  color: hasInsufficientFunds
-                                      ? AppColors.errorRed
-                                      : color,
-                                  fontSize: 24,
-                                  fontWeight: FontWeight.bold),
-                            ),
-                    ],
-                  ),
-                  if (widget.isBuy) ...[
-                    const SizedBox(height: 12),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  const SizedBox(height: 32),
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: AppColors.cardBackground,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                          color: AppColors.greyText.withValues(alpha: 0.1)),
+                    ),
+                    child: Column(
                       children: [
-                        const Text('Available Balance',
-                            style: TextStyle(
-                                color: AppColors.greyText, fontSize: 14)),
-                        _isBalanceLoading
-                            ? const SizedBox(
-                                width: 12,
-                                height: 12,
-                                child:
-                                    CircularProgressIndicator(strokeWidth: 2))
-                            : Text(
-                                '${_availableBalance.toStringAsFixed(2)} $_selectedCurrency',
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('Price per gram',
+                                style: TextStyle(color: AppColors.greyText)),
+                            _isPriceLoading
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(strokeWidth: 2))
+                                : Text(
+                                    '${_currentPricePerGram.toStringAsFixed(2)} $_selectedCurrency',
+                                    style: const TextStyle(
+                                        color: AppColors.whiteText,
+                                        fontWeight: FontWeight.bold),
+                                  ),
+                          ],
+                        ),
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 16),
+                          child: Divider(color: AppColors.greyText),
+                        ),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text('Total Value',
                                 style: TextStyle(
-                                  color: hasInsufficientFunds
-                                      ? AppColors.errorRed
-                                      : AppColors.whiteText,
+                                    color: AppColors.whiteText, fontSize: 18)),
+                            _isPriceLoading
+                                ? const SizedBox(
+                                    width: 24,
+                                    height: 24,
+                                    child: CircularProgressIndicator(strokeWidth: 2))
+                                : Text(
+                                    '${_totalValue.toStringAsFixed(2)} $_selectedCurrency',
+                                    style: TextStyle(
+                                        color: hasInsufficientFunds
+                                            ? AppColors.errorRed
+                                            : color,
+                                        fontSize: 24,
+                                        fontWeight: FontWeight.bold),
+                                  ),
+                          ],
+                        ),
+                        if (widget.isBuy) ...[
+                          const SizedBox(height: 12),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text('Available Balance',
+                                  style: TextStyle(
+                                      color: AppColors.greyText, fontSize: 14)),
+                              _isBalanceLoading
+                                  ? const SizedBox(
+                                      width: 12,
+                                      height: 12,
+                                      child:
+                                          CircularProgressIndicator(strokeWidth: 2))
+                                  : Text(
+                                      '${_availableBalance.toStringAsFixed(2)} $_selectedCurrency',
+                                      style: TextStyle(
+                                        color: hasInsufficientFunds
+                                            ? AppColors.errorRed
+                                            : AppColors.whiteText,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                            ],
+                          ),
+                        ] else ...[
+                          const SizedBox(height: 12),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text('Current Gold Balance',
+                                  style: TextStyle(
+                                      color: AppColors.greyText, fontSize: 14)),
+                              Text(
+                                '${_availableGoldHoldings.toStringAsFixed(3)}g',
+                                style: const TextStyle(
+                                  color: AppColors.whiteText,
                                   fontSize: 14,
                                   fontWeight: FontWeight.w500,
                                 ),
                               ),
-                      ],
-                    ),
-                  ] else ...[
-                    const SizedBox(height: 12),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('Current Gold Balance',
-                            style: TextStyle(
-                                color: AppColors.greyText, fontSize: 14)),
-                        Text(
-                          '${_availableGoldHoldings.toStringAsFixed(3)}g',
-                          style: const TextStyle(
-                            color: AppColors.whiteText,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
+                            ],
                           ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('Estimated Remaining Gold',
-                            style: TextStyle(
-                                color: AppColors.greyText, fontSize: 14)),
-                        Text(
-                          '${(_availableGoldHoldings - (double.tryParse(_gramsController.text) ?? 0.0)).toStringAsFixed(3)}g',
-                          style: TextStyle(
-                            color: (_availableGoldHoldings -
-                                        (double.tryParse(
-                                                _gramsController.text) ??
-                                            0.0)) <
-                                    0
-                                ? AppColors.errorRed
-                                : AppColors.primaryGold,
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
+                          const SizedBox(height: 12),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              const Text('Estimated Remaining Gold',
+                                  style: TextStyle(
+                                      color: AppColors.greyText, fontSize: 14)),
+                              Text(
+                                '${(_availableGoldHoldings - (double.tryParse(_gramsController.text) ?? 0.0)).toStringAsFixed(3)}g',
+                                style: TextStyle(
+                                  color: (_availableGoldHoldings -
+                                              (double.tryParse(
+                                                      _gramsController.text) ??
+                                                  0.0)) <
+                                          0
+                                      ? AppColors.errorRed
+                                      : AppColors.primaryGold,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
                           ),
-                        ),
+                        ],
                       ],
                     ),
-                  ],
+                  ),
+                  const Spacer(),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: _isLoading ||
+                              _isPriceLoading ||
+                              hasInsufficientFunds ||
+                              hasInsufficientGold
+                          ? null
+                          : _confirmTrade,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: color,
+                        disabledBackgroundColor: color.withValues(alpha: 0.3),
+                        padding: const EdgeInsets.symmetric(vertical: 18),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: _isLoading
+                          ? const SizedBox(
+                              height: 24,
+                              width: 24,
+                              child: CircularProgressIndicator(
+                                  color: Colors.white, strokeWidth: 2),
+                            )
+                          : Text(
+                              hasInsufficientFunds
+                                  ? 'Insufficient Funds'
+                                  : hasInsufficientGold
+                                      ? 'Insufficient Gold'
+                                      : 'Confirm $action',
+                              style: const TextStyle(
+                                  fontSize: 18, fontWeight: FontWeight.bold),
+                            ),
+                    ),
+                  ),
                 ],
               ),
             ),
-            const Spacer(),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _isLoading ||
-                        _isPriceLoading ||
-                        hasInsufficientFunds ||
-                        hasInsufficientGold
-                    ? null
-                    : _confirmTrade,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: color,
-                  disabledBackgroundColor: color.withValues(alpha: 0.3),
-                  padding: const EdgeInsets.symmetric(vertical: 18),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: _isLoading
-                    ? const SizedBox(
-                        height: 24,
-                        width: 24,
-                        child: CircularProgressIndicator(
-                            color: Colors.white, strokeWidth: 2),
-                      )
-                    : Text(
-                        hasInsufficientFunds
-                            ? 'Insufficient Funds'
-                            : hasInsufficientGold
-                                ? 'Insufficient Gold'
-                                : 'Confirm $action',
-                        style: const TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.bold),
-                      ),
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

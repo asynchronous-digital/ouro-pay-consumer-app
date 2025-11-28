@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:ouro_pay_consumer_app/config/app_config.dart';
 import 'package:ouro_pay_consumer_app/theme/app_theme.dart';
 import 'package:ouro_pay_consumer_app/models/deposit.dart';
 import 'package:ouro_pay_consumer_app/services/deposit_service.dart';
@@ -80,7 +81,29 @@ class _AddMoneyPageState extends State<AddMoneyPage> {
                 '🔵 Stripe: client_secret received: ${response.clientSecret}');
             try {
               print('🔵 Stripe: Initializing Payment Sheet...');
-              // Initialize and present Payment Sheet
+            
+            // Defensive initialization: Ensure Stripe is configured
+            try {
+              // Try to access the key to see if it throws
+              final key = Stripe.publishableKey;
+              if (key.isEmpty) throw Exception('Key is empty');
+            } catch (_) {
+              print('⚠️ Stripe not initialized, re-initializing...');
+              final stripeKey = AppConfig.stripePublishableKey;
+              if (stripeKey.isNotEmpty) {
+                Stripe.publishableKey = stripeKey;
+                Stripe.merchantIdentifier = 'merchant.com.ouropay.consumer';
+                Stripe.urlScheme = 'ouropay';
+                await Stripe.instance.applySettings();
+                print('✅ Stripe re-initialized successfully');
+              } else {
+                throw Exception('Stripe publishable key is missing in config');
+              }
+            }
+            
+
+
+            // Initialize and present Payment Sheet
               await Stripe.instance.initPaymentSheet(
                 paymentSheetParameters: SetupPaymentSheetParameters(
                   paymentIntentClientSecret: response.clientSecret!,

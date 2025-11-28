@@ -17,6 +17,9 @@ Future<void> main() async {
   final stripeKey = AppConfig.stripePublishableKey;
   if (stripeKey.isNotEmpty) {
     Stripe.publishableKey = stripeKey;
+    Stripe.merchantIdentifier = 'merchant.com.ouropay.consumer';
+    Stripe.urlScheme = 'ouropay';
+    await Stripe.instance.applySettings();
   }
 
   runApp(const OuroPayApp());

@@ -110,146 +110,153 @@ class _TradeGoldPageState extends State<TradeGoldPage> {
         backgroundColor: AppColors.darkBackground,
       ),
       backgroundColor: AppColors.darkBackground,
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Price Display Area
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                gradient: AppColors.goldGradient,
-                borderRadius: BorderRadius.circular(20),
-              ),
+      body: CustomScrollView(
+        slivers: [
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text(
-                        'Current Price',
-                        style: TextStyle(
-                          color: AppColors.darkBackground,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
-                      GestureDetector(
-                        onTap: _showCurrencyPicker,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                          decoration: BoxDecoration(
-                            color: AppColors.darkBackground.withOpacity(0.2),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Row(
-                            children: [
-                              Text(
-                                _selectedCurrency,
-                                style: const TextStyle(
-                                  color: AppColors.darkBackground,
-                                  fontWeight: FontWeight.bold,
+                  // Price Display Area
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      gradient: AppColors.goldGradient,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Column(
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Current Price',
+                              style: TextStyle(
+                                color: AppColors.darkBackground,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                            GestureDetector(
+                              onTap: _showCurrencyPicker,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                decoration: BoxDecoration(
+                                  color: AppColors.darkBackground.withOpacity(0.2),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Text(
+                                      _selectedCurrency,
+                                      style: const TextStyle(
+                                        color: AppColors.darkBackground,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 4),
+                                    const Icon(Icons.arrow_drop_down, color: AppColors.darkBackground),
+                                  ],
                                 ),
                               ),
-                              const SizedBox(width: 4),
-                              const Icon(Icons.arrow_drop_down, color: AppColors.darkBackground),
-                            ],
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 20),
+                        _isLoading
+                            ? const CircularProgressIndicator(color: AppColors.darkBackground)
+                            : _priceData != null
+                                ? Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                                    children: [
+                                      Column(
+                                        children: [
+                                          const Text(
+                                            'BUY',
+                                            style: TextStyle(
+                                              color: AppColors.darkBackground,
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                          Text(
+                                            '${_priceData!.getFormattedBuyPrice()} $_selectedCurrency',
+                                            style: const TextStyle(
+                                              color: AppColors.darkBackground,
+                                              fontSize: 20,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      Container(
+                                        height: 40,
+                                        width: 1,
+                                        color: AppColors.darkBackground.withOpacity(0.3),
+                                      ),
+                                      Column(
+                                        children: [
+                                          const Text(
+                                            'SELL',
+                                            style: TextStyle(
+                                              color: AppColors.darkBackground,
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                          Text(
+                                            '${_priceData!.getFormattedSellPrice()} $_selectedCurrency',
+                                            style: const TextStyle(
+                                              color: AppColors.darkBackground,
+                                              fontSize: 20,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  )
+                                : const Text('Price unavailable', style: TextStyle(color: AppColors.darkBackground)),
+                      ],
+                    ),
+                  ),
+                  const Spacer(),
+                  // Action buttons
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          icon: const Icon(Icons.add_shopping_cart),
+                          label: const Text('Buy Gold'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.successGreen,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
                           ),
+                          onPressed: () => _navigateToConfirmation(isBuy: true),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          icon: const Icon(Icons.sell),
+                          label: const Text('Sell Gold'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.errorRed,
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                          ),
+                          onPressed: () => _navigateToConfirmation(isBuy: false),
                         ),
                       ),
                     ],
                   ),
                   const SizedBox(height: 20),
-                  _isLoading
-                      ? const CircularProgressIndicator(color: AppColors.darkBackground)
-                      : _priceData != null
-                          ? Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceAround,
-                              children: [
-                                Column(
-                                  children: [
-                                    const Text(
-                                      'BUY',
-                                      style: TextStyle(
-                                        color: AppColors.darkBackground,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                    Text(
-                                      '${_priceData!.getFormattedBuyPrice()} $_selectedCurrency',
-                                      style: const TextStyle(
-                                        color: AppColors.darkBackground,
-                                        fontSize: 20,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                Container(
-                                  height: 40,
-                                  width: 1,
-                                  color: AppColors.darkBackground.withOpacity(0.3),
-                                ),
-                                Column(
-                                  children: [
-                                    const Text(
-                                      'SELL',
-                                      style: TextStyle(
-                                        color: AppColors.darkBackground,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                    Text(
-                                      '${_priceData!.getFormattedSellPrice()} $_selectedCurrency',
-                                      style: const TextStyle(
-                                        color: AppColors.darkBackground,
-                                        fontSize: 20,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            )
-                          : const Text('Price unavailable', style: TextStyle(color: AppColors.darkBackground)),
                 ],
               ),
             ),
-            const Spacer(),
-            // Action buttons
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    icon: const Icon(Icons.add_shopping_cart),
-                    label: const Text('Buy Gold'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.successGreen,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                    ),
-                    onPressed: () => _navigateToConfirmation(isBuy: true),
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    icon: const Icon(Icons.sell),
-                    label: const Text('Sell Gold'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.errorRed,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                    ),
-                    onPressed: () => _navigateToConfirmation(isBuy: false),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
