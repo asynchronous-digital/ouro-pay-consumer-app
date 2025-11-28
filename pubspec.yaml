@@ -67,6 +67,9 @@ dependencies:
   
   # Toast messages for notifications
   fluttertoast: ^8.2.4
+  
+  # Image compression
+  flutter_image_compress: ^2.1.0
 
 dev_dependencies:
   flutter_test:

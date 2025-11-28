@@ -253,7 +253,7 @@ class _DashboardPageState extends State<DashboardPage>
   }
 
   // State variables
-  bool _isBalanceVisible = true; // New state variable
+  bool _isBalanceVisible = false; // Hide balance by default for privacy
 
   Future<void> _loadGoldPrice({String? currency}) async {
     setState(() {
@@ -450,25 +450,49 @@ class _DashboardPageState extends State<DashboardPage>
             gradient: AppColors.goldGradient,
             borderRadius: BorderRadius.circular(20),
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(
-                Icons.stars,
-                size: 16,
-                color: AppColors.darkBackground,
-              ),
-              const SizedBox(width: 4),
-              Text(
-                _portfolio.goldHolding.formattedGrams,
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.darkBackground,
+          child: _isLoadingGold
+              ? Shimmer.fromColors(
+                  baseColor: AppColors.darkBackground.withOpacity(0.6),
+                  highlightColor: AppColors.darkBackground.withOpacity(0.3),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.stars,
+                        size: 16,
+                        color: AppColors.darkBackground,
+                      ),
+                      const SizedBox(width: 4),
+                      Container(
+                        width: 40,
+                        height: 12,
+                        decoration: BoxDecoration(
+                          color: AppColors.darkBackground,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              : Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.stars,
+                      size: 16,
+                      color: AppColors.darkBackground,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      _portfolio.goldHolding.formattedGrams,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.darkBackground,
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ],
-          ),
         ),
 
         // Profile menu
@@ -1624,7 +1648,7 @@ class _DashboardPageState extends State<DashboardPage>
   /// Show KYC verification toast message
   void _showKycVerificationMessage() {
     Fluttertoast.showToast(
-      msg: "Waiting for your account verification",
+      msg: "Waiting For KYC Approval",
       toastLength: Toast.LENGTH_LONG,
       gravity: ToastGravity.BOTTOM,
       backgroundColor: AppColors.cardBackground,
@@ -1643,21 +1667,37 @@ class _DashboardPageState extends State<DashboardPage>
   }
 
   /// Handle Transfer button press
-  void _handleTransfer() {
+  Future<void> _handleTransfer() async {
     if (_isKycApproved) {
-      Navigator.pushNamed(context, '/conversion');
+      // Wait for navigation to complete (user returns to dashboard)
+      await Navigator.pushNamed(context, '/conversion');
+
+      // When user returns to dashboard, refresh wallet balances
+      if (mounted) {
+        print('💰 Dashboard: Returned from Conversion, refreshing data...');
+        await _refreshData();
+        print('✅ Dashboard: Data refreshed successfully');
+      }
     } else {
       _showKycVerificationMessage();
     }
   }
 
   /// Handle Trade Gold button press
-  void _handleTradeGold() {
+  Future<void> _handleTradeGold() async {
     if (_isKycApproved) {
-      Navigator.push(
+      // Wait for navigation to complete (user returns to dashboard)
+      await Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => const TradeGoldPage()),
       );
+
+      // When user returns to dashboard, refresh gold holdings and wallet data
+      if (mounted) {
+        print('💰 Dashboard: Returned from Trade Gold, refreshing data...');
+        await _refreshData();
+        print('✅ Dashboard: Data refreshed successfully');
+      }
     } else {
       _showKycVerificationMessage();
     }
@@ -1687,7 +1727,19 @@ class _DashboardPageState extends State<DashboardPage>
     return SizedBox(
       width: isFullWidth ? double.infinity : null,
       child: ElevatedButton.icon(
-        onPressed: onPressed,
+        onPressed: isEnabled
+            ? onPressed
+            : () {
+                // Show toast when disabled button is clicked
+                Fluttertoast.showToast(
+                  msg: "Waiting For KYC Approval",
+                  toastLength: Toast.LENGTH_SHORT,
+                  gravity: ToastGravity.BOTTOM,
+                  backgroundColor: AppColors.warningOrange,
+                  textColor: AppColors.whiteText,
+                  fontSize: 14.0,
+                );
+              },
         icon: Icon(icon, size: 20),
         label: Text(label),
         style: ElevatedButton.styleFrom(
@@ -1852,13 +1904,20 @@ class _DashboardPageState extends State<DashboardPage>
     }
   }
 
-  void _showAddMoneyDialog() {
-    Navigator.push(
+  Future<void> _showAddMoneyDialog() async {
+    final result = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
         builder: (context) => const AddMoneyPage(),
       ),
     );
+
+    // If payment was successful, refresh dashboard data
+    if (result == true && mounted) {
+      print('💰 Dashboard: Payment successful, refreshing data...');
+      await _refreshData();
+      print('✅ Dashboard: Data refreshed successfully');
+    }
   }
 
   void _showComingSoon() {

@@ -67,6 +67,10 @@ class Deposit {
     return '${_getCurrencySymbol(currencyCode)}${netAmount.toStringAsFixed(2)}';
   }
 
+  String get formattedFee {
+    return '${_getCurrencySymbol(currencyCode)}${fee.toStringAsFixed(2)}';
+  }
+
   String _getCurrencySymbol(String code) {
     switch (code.toUpperCase()) {
       case 'EUR':

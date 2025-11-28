@@ -10,6 +10,8 @@ import 'dart:io';
 import 'package:ouro_pay_consumer_app/models/country.dart';
 import 'package:country_code_picker/country_code_picker.dart';
 
+import 'package:flutter_image_compress/flutter_image_compress.dart';
+
 class SignUpPage extends StatefulWidget {
   const SignUpPage({super.key});
 
@@ -75,6 +77,7 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
 
   late FaceDetector _faceDetector;
 
+  @override
   void initState() {
     super.initState();
     _pageController = PageController();
@@ -86,6 +89,15 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
         Tween<double>(begin: 0.0, end: 1.0).animate(_fadeController);
     _fadeController.forward();
     _fetchCountries();
+
+    // Add listeners to update button state when fields change
+    _firstNameController.addListener(() => setState(() {}));
+    _lastNameController.addListener(() => setState(() {}));
+    _emailController.addListener(() => setState(() {}));
+    _phoneController.addListener(() => setState(() {}));
+    _dobController.addListener(() => setState(() {}));
+    _passwordController.addListener(() => setState(() {}));
+    _confirmPasswordController.addListener(() => setState(() {}));
   }
 
   @override
@@ -104,6 +116,9 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
   }
 
   void _nextStep() {
+    // Dismiss keyboard when moving between steps
+    FocusScope.of(context).unfocus();
+
     if (_currentStep < _totalSteps - 1) {
       setState(() {
         _currentStep++;
@@ -627,16 +642,16 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: _isStepOneSubmitting
-                    ? null
-                    : () {
-                        // if (_personalFormKey.currentState!.validate()) {
-                        _handleStepOneContinue();
-                        // }
-                      },
+                onPressed:
+                    (_isStepOneSubmitting || !_canProceedFromPersonalInfo())
+                        ? null
+                        : () {
+                            _handleStepOneContinue();
+                          },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primaryGold,
                   foregroundColor: AppColors.darkBackground,
+                  disabledBackgroundColor: AppColors.greyText,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
@@ -668,6 +683,9 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
 
   Future<void> _handleStepOneContinue() async {
     if (_isStepOneSubmitting) return;
+
+    // Dismiss keyboard
+    FocusScope.of(context).unfocus();
 
     setState(() {
       _isStepOneSubmitting = true;
@@ -862,6 +880,9 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
 
   Future<void> _handleOtpVerification() async {
     if (_isOtpSubmitting) return;
+
+    // Dismiss keyboard
+    FocusScope.of(context).unfocus();
 
     final otp = _otpController.text.trim();
     if (otp.isEmpty) {
@@ -1085,6 +1106,16 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
                   ),
                   textAlign: TextAlign.center,
                 ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Maximum file size: 2MB',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppColors.primaryGold,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
 
                 // Show uploaded file
                 if (_documentFile != null) ...[
@@ -1143,22 +1174,36 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: _documentsUploaded ? _nextStep : null,
+              onPressed: (_documentsUploaded &&
+                      !_isLoadingCountries &&
+                      _selectedCountry != null)
+                  ? _nextStep
+                  : null,
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primaryGold,
                 foregroundColor: AppColors.darkBackground,
+                disabledBackgroundColor: AppColors.greyText,
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
               ),
-              child: const Text(
-                'Continue',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+              child: _isLoadingCountries
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        color: AppColors.darkBackground,
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : const Text(
+                      'Continue',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
             ),
           ),
         ],
@@ -1856,20 +1901,28 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
       );
 
       if (image != null) {
-        final file = File(image.path);
-        final fileSize = await file.length();
+        // Compress image to ensure it's under 2MB
+        final compressedFile = await _compressImage(File(image.path));
 
-        // Check file size (max 10MB)
-        if (fileSize > 10 * 1024 * 1024) {
+        if (compressedFile == null) {
+          if (!mounted) return;
+          _showTopSnackBar('Failed to process image', AppColors.errorRed);
+          return;
+        }
+
+        final fileSize = await compressedFile.length();
+
+        // Check file size (max 2MB)
+        if (fileSize > 2 * 1024 * 1024) {
           if (!mounted) return;
           _showTopSnackBar(
-              'File size must be less than 10MB', AppColors.errorRed);
+              'File size must be less than 2MB', AppColors.errorRed);
           return;
         }
 
         setState(() {
-          _documentFile = file;
-          _documentPath = image.path;
+          _documentFile = compressedFile;
+          _documentPath = compressedFile.path;
           _documentsUploaded = true;
         });
 
@@ -1895,15 +1948,28 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
       );
 
       if (image != null) {
-        final file = File(image.path);
-        final fileSize = await file.length();
+        // Compress image to ensure it's under 2MB
+        final compressedFile = await _compressImage(File(image.path));
 
-        // Check file size (max 10MB)
-        if (fileSize > 10 * 1024 * 1024) {
+        if (compressedFile == null) {
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('File size must be less than 10MB'),
+              content: Text('Failed to process image'),
+              backgroundColor: AppColors.errorRed,
+            ),
+          );
+          return;
+        }
+
+        final fileSize = await compressedFile.length();
+
+        // Check file size (max 2MB)
+        if (fileSize > 2 * 1024 * 1024) {
+          if (!mounted) return;
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('File size must be less than 2MB'),
               backgroundColor: AppColors.errorRed,
             ),
           );
@@ -1911,8 +1977,8 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
         }
 
         setState(() {
-          _documentFile = file;
-          _documentPath = image.path;
+          _documentFile = compressedFile;
+          _documentPath = compressedFile.path;
           _documentsUploaded = true;
         });
 
@@ -1939,12 +2005,12 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
         final file = File(result.files.single.path!);
         final fileSize = await file.length();
 
-        // Check file size (max 10MB)
-        if (fileSize > 10 * 1024 * 1024) {
+        // Check file size (max 2MB)
+        if (fileSize > 2 * 1024 * 1024) {
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('File size must be less than 10MB'),
+              content: Text('File size must be less than 2MB'),
               backgroundColor: AppColors.errorRed,
             ),
           );
@@ -1966,6 +2032,50 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
       if (!mounted) return;
       _showTopSnackBar(
           'Error selecting PDF: ${e.toString()}', AppColors.errorRed);
+    }
+  }
+
+  /// Compress image to ensure it's under 2MB
+  Future<File?> _compressImage(File file) async {
+    try {
+      final filePath = file.absolute.path;
+      final lastIndex = filePath.lastIndexOf(RegExp(r'.jp'));
+      final splitted = filePath.substring(0, lastIndex);
+      final outPath = '${splitted}_compressed.jpg';
+
+      // Start with 85% quality
+      int quality = 85;
+      File? compressedFile;
+
+      // Try compressing with decreasing quality until file is under 2MB
+      while (quality >= 40) {
+        final result = await FlutterImageCompress.compressAndGetFile(
+          file.absolute.path,
+          outPath,
+          quality: quality,
+          minWidth: 1920,
+          minHeight: 1920,
+        );
+
+        if (result == null) break;
+
+        compressedFile = File(result.path);
+        final fileSize = await compressedFile.length();
+
+        // If file is under 2MB, we're done
+        if (fileSize <= 2 * 1024 * 1024) {
+          return compressedFile;
+        }
+
+        // Reduce quality for next attempt
+        quality -= 15;
+      }
+
+      // Return the most compressed version we got
+      return compressedFile ?? file;
+    } catch (e) {
+      print('Error compressing image: $e');
+      return file; // Return original file if compression fails
     }
   }
 
@@ -2098,11 +2208,19 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
         }
       }
 
-      // 5. Success - Save the selfie
+      // 5. Success - Compress and save the selfie
+      // Compress the selfie image
+      final compressedSelfie = await _compressImage(File(image.path));
+
+      if (compressedSelfie == null) {
+        _showError('Failed to process selfie image');
+        return;
+      }
+
       setState(() {
         _selfieCompleted = true;
-        _selfieFile = File(image.path);
-        _selfiePath = image.path;
+        _selfieFile = compressedSelfie;
+        _selfiePath = compressedSelfie.path;
       });
 
       // Show success snackbar (preview is already visible on the page)
@@ -2242,6 +2360,18 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
     }
   }
 
+  bool _canProceedFromPersonalInfo() {
+    // Check if all required fields are filled
+    return _firstNameController.text.trim().isNotEmpty &&
+        _lastNameController.text.trim().isNotEmpty &&
+        _emailController.text.trim().isNotEmpty &&
+        _phoneController.text.trim().isNotEmpty &&
+        _dobController.text.trim().isNotEmpty &&
+        _passwordController.text.trim().isNotEmpty &&
+        _confirmPasswordController.text.trim().isNotEmpty &&
+        _passwordController.text == _confirmPasswordController.text;
+  }
+
   bool _canSubmit() {
     return _documentsUploaded && _selfieCompleted && _termsAccepted;
   }
@@ -2335,7 +2465,10 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
         // Reset form fields
         _resetForm();
 
-        // Navigate to login page and return true to indicate success
+        // Show success toast message
+        // Toast removed as per request, relying on the one in LoginPage
+
+        // Navigate back to login page
         Navigator.of(context).pop(true);
       } else {
         // Handle validation errors

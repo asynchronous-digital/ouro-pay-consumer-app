@@ -276,11 +276,12 @@ class _ConversionPageState extends State<ConversionPage> {
           TextButton(
             onPressed: () {
               Navigator.pop(context); // Close dialog
-              Navigator.pop(context); // Go back to dashboard
+              Navigator.of(context)
+                  .popUntil((route) => route.isFirst); // Go back to dashboard
             },
             child: const Text(
-              'Done',
-              style: TextStyle(color: AppColors.greyText),
+              'OK',
+              style: TextStyle(color: AppColors.whiteText),
             ),
           ),
           ElevatedButton(

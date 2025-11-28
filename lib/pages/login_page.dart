@@ -400,6 +400,9 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
   }
 
   Future<void> _handleLogin() async {
+    // Dismiss keyboard when login button is pressed
+    FocusScope.of(context).unfocus();
+
     if (_formKey.currentState?.validate() ?? false) {
       setState(() {
         _isLoading = true;
