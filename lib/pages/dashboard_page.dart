@@ -9,6 +9,7 @@ import 'package:ouro_pay_consumer_app/services/wallet_service.dart';
 import 'package:ouro_pay_consumer_app/services/gold_service.dart';
 import 'package:ouro_pay_consumer_app/pages/trade_gold_page.dart';
 import 'package:ouro_pay_consumer_app/pages/gold_transactions_page.dart';
+import 'package:ouro_pay_consumer_app/pages/help_support_page.dart';
 import 'package:ouro_pay_consumer_app/pages/add_money_page.dart';
 import 'package:ouro_pay_consumer_app/pages/deposit_history_page.dart';
 import 'package:ouro_pay_consumer_app/utils/debug_prefs.dart';
@@ -1789,7 +1790,13 @@ class _DashboardPageState extends State<DashboardPage>
               leading: const Icon(Icons.help, color: AppColors.primaryGold),
               title: const Text('Help & Support',
                   style: TextStyle(color: AppColors.whiteText)),
-              onTap: () => _showComingSoon(),
+              onTap: () {
+                Navigator.pop(context);
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const HelpSupportPage()),
+                );
+              },
             ),
             const Divider(color: AppColors.greyText),
             ListTile(
