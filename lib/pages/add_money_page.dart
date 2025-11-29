@@ -81,29 +81,28 @@ class _AddMoneyPageState extends State<AddMoneyPage> {
                 '🔵 Stripe: client_secret received: ${response.clientSecret}');
             try {
               print('🔵 Stripe: Initializing Payment Sheet...');
-            
-            // Defensive initialization: Ensure Stripe is configured
-            try {
-              // Try to access the key to see if it throws
-              final key = Stripe.publishableKey;
-              if (key.isEmpty) throw Exception('Key is empty');
-            } catch (_) {
-              print('⚠️ Stripe not initialized, re-initializing...');
-              final stripeKey = AppConfig.stripePublishableKey;
-              if (stripeKey.isNotEmpty) {
-                Stripe.publishableKey = stripeKey;
-                Stripe.merchantIdentifier = 'merchant.com.ouropay.consumer';
-                Stripe.urlScheme = 'ouropay';
-                await Stripe.instance.applySettings();
-                print('✅ Stripe re-initialized successfully');
-              } else {
-                throw Exception('Stripe publishable key is missing in config');
+
+              // Defensive initialization: Ensure Stripe is configured
+              try {
+                // Try to access the key to see if it throws
+                final key = Stripe.publishableKey;
+                if (key.isEmpty) throw Exception('Key is empty');
+              } catch (_) {
+                print('⚠️ Stripe not initialized, re-initializing...');
+                final stripeKey = AppConfig.stripePublishableKey;
+                if (stripeKey.isNotEmpty) {
+                  Stripe.publishableKey = stripeKey;
+                  Stripe.merchantIdentifier = 'merchant.com.ouropay.consumer';
+                  Stripe.urlScheme = 'ouropay';
+                  await Stripe.instance.applySettings();
+                  print('✅ Stripe re-initialized successfully');
+                } else {
+                  throw Exception(
+                      'Stripe publishable key is missing in config');
+                }
               }
-            }
-            
 
-
-            // Initialize and present Payment Sheet
+              // Initialize and present Payment Sheet
               await Stripe.instance.initPaymentSheet(
                 paymentSheetParameters: SetupPaymentSheetParameters(
                   paymentIntentClientSecret: response.clientSecret!,
@@ -302,6 +301,7 @@ class _AddMoneyPageState extends State<AddMoneyPage> {
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
                       value: _selectedCurrency,
+                      isExpanded: true,
                       dropdownColor: AppColors.cardBackground,
                       style: const TextStyle(
                           color: AppColors.whiteText, fontSize: 16),
@@ -527,18 +527,14 @@ class _AddMoneyPageState extends State<AddMoneyPage> {
   ) {
     return DropdownMenuItem<String>(
       value: code,
-      child: Row(
-        children: [
-          Text(
-            symbol,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Text('$code - $name'),
-        ],
+      child: Text(
+        '$symbol  $code - $name',
+        style: const TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w500,
+        ),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
       ),
     );
   }
