@@ -31,6 +31,7 @@ class _TradeConfirmationPageState extends State<TradeConfirmationPage> {
   bool _isPriceLoading = false;
   bool _isBalanceLoading = false;
   double _availableGoldHoldings = 0.0;
+  DateTime? _lastInsufficientFundsSnackbar;
 
   @override
   void initState() {
@@ -56,6 +57,46 @@ class _TradeConfirmationPageState extends State<TradeConfirmationPage> {
     setState(() {
       _totalValue = grams * _currentPricePerGram;
     });
+  }
+
+  void _showInsufficientFundsMessage() {
+    // Throttle snackbar to once every 2 seconds
+    final now = DateTime.now();
+    if (_lastInsufficientFundsSnackbar != null &&
+        now.difference(_lastInsufficientFundsSnackbar!).inSeconds < 2) {
+      return;
+    }
+    _lastInsufficientFundsSnackbar = now;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Insufficient funds. Available: ${_availableBalance.toStringAsFixed(2)} $_selectedCurrency',
+        ),
+        backgroundColor: AppColors.errorRed,
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
+  void _showInsufficientGoldMessage() {
+    // Throttle snackbar to once every 2 seconds
+    final now = DateTime.now();
+    if (_lastInsufficientFundsSnackbar != null &&
+        now.difference(_lastInsufficientFundsSnackbar!).inSeconds < 2) {
+      return;
+    }
+    _lastInsufficientFundsSnackbar = now;
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Insufficient gold. Available: ${_availableGoldHoldings.toStringAsFixed(3)}g',
+        ),
+        backgroundColor: AppColors.errorRed,
+        duration: const Duration(seconds: 2),
+      ),
+    );
   }
 
   Future<void> _fetchBalance() async {
@@ -407,20 +448,34 @@ class _TradeConfirmationPageState extends State<TradeConfirmationPage> {
                     keyboardType:
                         const TextInputType.numberWithOptions(decimal: true),
                     inputFormatters: [
-                      FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,3}')),
-                      if (!widget.isBuy) MaxAmountFormatter(_availableGoldHoldings),
+                      FilteringTextInputFormatter.allow(
+                          RegExp(r'^\d*\.?\d{0,3}')),
+                      if (widget.isBuy)
+                        MaxAffordableGramsFormatter(
+                          _availableBalance,
+                          _currentPricePerGram,
+                          onExceeded: _showInsufficientFundsMessage,
+                        )
+                      else
+                        MaxAmountFormatter(
+                          _availableGoldHoldings,
+                          onExceeded: _showInsufficientGoldMessage,
+                        ),
                     ],
-                    style: const TextStyle(color: AppColors.whiteText, fontSize: 24),
+                    style: const TextStyle(
+                        color: AppColors.whiteText, fontSize: 24),
                     decoration: InputDecoration(
                       suffixText: 'grams',
-                      suffixStyle: const TextStyle(color: AppColors.primaryGold),
+                      suffixStyle:
+                          const TextStyle(color: AppColors.primaryGold),
                       enabledBorder: OutlineInputBorder(
                         borderSide: BorderSide(
                             color: AppColors.greyText.withValues(alpha: 0.3)),
                         borderRadius: BorderRadius.circular(12),
                       ),
                       focusedBorder: OutlineInputBorder(
-                        borderSide: const BorderSide(color: AppColors.primaryGold),
+                        borderSide:
+                            const BorderSide(color: AppColors.primaryGold),
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
@@ -445,7 +500,8 @@ class _TradeConfirmationPageState extends State<TradeConfirmationPage> {
                                 ? const SizedBox(
                                     width: 16,
                                     height: 16,
-                                    child: CircularProgressIndicator(strokeWidth: 2))
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2))
                                 : Text(
                                     '${_currentPricePerGram.toStringAsFixed(2)} $_selectedCurrency',
                                     style: const TextStyle(
@@ -468,7 +524,8 @@ class _TradeConfirmationPageState extends State<TradeConfirmationPage> {
                                 ? const SizedBox(
                                     width: 24,
                                     height: 24,
-                                    child: CircularProgressIndicator(strokeWidth: 2))
+                                    child: CircularProgressIndicator(
+                                        strokeWidth: 2))
                                 : Text(
                                     '${_totalValue.toStringAsFixed(2)} $_selectedCurrency',
                                     style: TextStyle(
@@ -492,8 +549,8 @@ class _TradeConfirmationPageState extends State<TradeConfirmationPage> {
                                   ? const SizedBox(
                                       width: 12,
                                       height: 12,
-                                      child:
-                                          CircularProgressIndicator(strokeWidth: 2))
+                                      child: CircularProgressIndicator(
+                                          strokeWidth: 2))
                                   : Text(
                                       '${_availableBalance.toStringAsFixed(2)} $_selectedCurrency',
                                       style: TextStyle(
@@ -599,8 +656,9 @@ class _TradeConfirmationPageState extends State<TradeConfirmationPage> {
 
 class MaxAmountFormatter extends TextInputFormatter {
   final double maxAmount;
+  final VoidCallback? onExceeded;
 
-  MaxAmountFormatter(this.maxAmount);
+  MaxAmountFormatter(this.maxAmount, {this.onExceeded});
 
   @override
   TextEditingValue formatEditUpdate(
@@ -622,6 +680,50 @@ class MaxAmountFormatter extends TextInputFormatter {
     }
 
     if (newAmount > maxAmount) {
+      onExceeded?.call();
+      return oldValue;
+    }
+
+    return newValue;
+  }
+}
+
+class MaxAffordableGramsFormatter extends TextInputFormatter {
+  final double availableBalance;
+  final double pricePerGram;
+  final VoidCallback? onExceeded;
+
+  MaxAffordableGramsFormatter(
+    this.availableBalance,
+    this.pricePerGram, {
+    this.onExceeded,
+  });
+
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    if (newValue.text.isEmpty) {
+      return newValue;
+    }
+
+    // Allow partial inputs like "." or ".1" while typing
+    if (newValue.text == '.' || newValue.text.startsWith('.')) {
+      return newValue;
+    }
+
+    final grams = double.tryParse(newValue.text);
+    if (grams == null) {
+      return oldValue;
+    }
+
+    // Calculate the total cost for the entered grams
+    final totalCost = grams * pricePerGram;
+
+    // If total cost exceeds available balance, reject the input
+    if (totalCost > availableBalance) {
+      onExceeded?.call();
       return oldValue;
     }
 

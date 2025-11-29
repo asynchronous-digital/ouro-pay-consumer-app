@@ -16,7 +16,6 @@ import 'package:ouro_pay_consumer_app/utils/debug_prefs.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:flutter/services.dart';
 import 'package:ouro_pay_consumer_app/models/user_profile.dart';
-import 'package:fluttertoast/fluttertoast.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -1648,13 +1647,17 @@ class _DashboardPageState extends State<DashboardPage>
 
   /// Show KYC verification toast message
   void _showKycVerificationMessage() {
-    Fluttertoast.showToast(
-      msg: "Waiting For KYC Approval",
-      toastLength: Toast.LENGTH_LONG,
-      gravity: ToastGravity.BOTTOM,
-      backgroundColor: AppColors.cardBackground,
-      textColor: AppColors.whiteText,
-      fontSize: 16.0,
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Waiting For KYC Approval',
+          style: TextStyle(
+            color: AppColors.darkBackground,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        backgroundColor: AppColors.primaryGold,
+      ),
     );
   }
 
@@ -1731,15 +1734,8 @@ class _DashboardPageState extends State<DashboardPage>
         onPressed: isEnabled
             ? onPressed
             : () {
-                // Show toast when disabled button is clicked
-                Fluttertoast.showToast(
-                  msg: "Waiting For KYC Approval",
-                  toastLength: Toast.LENGTH_SHORT,
-                  gravity: ToastGravity.BOTTOM,
-                  backgroundColor: AppColors.warningOrange,
-                  textColor: AppColors.whiteText,
-                  fontSize: 14.0,
-                );
+                // Show snackbar when disabled button is clicked
+                _showKycVerificationMessage();
               },
         icon: Icon(icon, size: 20),
         label: Text(label),
@@ -1794,7 +1790,8 @@ class _DashboardPageState extends State<DashboardPage>
                 Navigator.pop(context);
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const HelpSupportPage()),
+                  MaterialPageRoute(
+                      builder: (context) => const HelpSupportPage()),
                 );
               },
             ),
