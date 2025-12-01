@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:ouro_pay_consumer_app/config/app_config.dart';
 import 'package:ouro_pay_consumer_app/theme/app_theme.dart';
 import 'package:ouro_pay_consumer_app/models/deposit.dart';
@@ -29,6 +30,9 @@ class _AddMoneyPageState extends State<AddMoneyPage> {
   }
 
   Future<void> _submitDeposit() async {
+    // Dismiss keyboard
+    FocusScope.of(context).unfocus();
+
     final amount = double.tryParse(_amountController.text);
 
     if (amount == null || amount <= 0) {
@@ -350,6 +354,10 @@ class _AddMoneyPageState extends State<AddMoneyPage> {
                       controller: _amountController,
                       keyboardType:
                           const TextInputType.numberWithOptions(decimal: true),
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(
+                            RegExp(r'^\d*\.?\d{0,2}')),
+                      ],
                       style: const TextStyle(
                         color: AppColors.whiteText,
                         fontSize: 24,
