@@ -33,6 +33,40 @@ class LoginResponse {
   }
 }
 
+/// Response model for step 1 validation
+class ValidationResponse {
+  final bool success;
+  final String? message;
+  final Map<String, List<String>>? errors;
+
+  ValidationResponse({
+    required this.success,
+    this.message,
+    this.errors,
+  });
+
+  factory ValidationResponse.fromJson(Map<String, dynamic> json) {
+    Map<String, List<String>>? errors;
+
+    if (json['errors'] != null && json['errors'] is Map) {
+      errors = {};
+      (json['errors'] as Map).forEach((key, value) {
+        if (value is List) {
+          errors![key.toString()] = value.map((e) => e.toString()).toList();
+        } else if (value is String) {
+          errors![key.toString()] = [value];
+        }
+      });
+    }
+
+    return ValidationResponse(
+      success: json['success'] ?? false,
+      message: json['message'],
+      errors: errors,
+    );
+  }
+}
+
 /// Response model for registration
 class RegisterResponse {
   final bool success;
@@ -107,6 +141,84 @@ class AuthService {
 
   /// Get SharedPreferences instance
   Future<SharedPreferences> get _prefs async => SharedPreferences.getInstance();
+
+  /// Validate step 1 of registration
+  ///
+  /// Makes a POST request to {{base_url}}/auth/register/validation/step1
+  Future<ValidationResponse> validateStep1({
+    required String firstName,
+    required String lastName,
+    required String email,
+    required String phone,
+    required String dateOfBirth,
+    required String password,
+    String? countryId,
+  }) async {
+    try {
+      final url = Uri.parse('$_baseUrl/auth/register/validation/step1');
+
+      // Prepare request body
+      final requestBody = {
+        'first_name': firstName,
+        'last_name': lastName,
+        'email': email,
+        'phone': phone,
+        'date_of_birth': dateOfBirth,
+        'password': password,
+        'password_confirmation': password,
+      };
+
+      if (countryId != null) {
+        requestBody['country_id'] = countryId;
+      }
+
+      print('');
+      print('═══════════════════════════════════════════════════════════');
+      print('🔵 VALIDATE STEP 1 API CALL');
+      print('═══════════════════════════════════════════════════════════');
+      print('📍 API Endpoint: $url');
+      print('📤 Request Body: ${jsonEncode(requestBody)}');
+      print('───────────────────────────────────────────────────────────');
+
+      final response = await http
+          .post(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: jsonEncode(requestBody),
+      )
+          .timeout(
+        AppConfig.connectionTimeout,
+        onTimeout: () {
+          throw Exception(
+              'Connection timeout. Please check your internet connection.');
+        },
+      );
+
+      print('📥 Response Status Code: ${response.statusCode}');
+      print('📥 Response Body: ${response.body}');
+
+      if (response.body.isEmpty) {
+        return ValidationResponse(
+          success: false,
+          message: 'Empty response from server',
+        );
+      }
+
+      final responseData = jsonDecode(response.body);
+      return ValidationResponse.fromJson(responseData);
+    } catch (e) {
+      print('❌ Validation Error: $e');
+      print('═══════════════════════════════════════════════════════════');
+      print('');
+      return ValidationResponse(
+        success: false,
+        message: 'An error occurred during validation',
+      );
+    }
+  }
 
   /// Register a new user
   ///

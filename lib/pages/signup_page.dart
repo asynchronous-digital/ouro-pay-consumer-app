@@ -8,7 +8,6 @@ import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:pinput/pinput.dart';
 import 'dart:io';
 import 'package:ouro_pay_consumer_app/models/country.dart';
-import 'package:country_code_picker/country_code_picker.dart';
 
 import 'package:flutter_image_compress/flutter_image_compress.dart';
 
@@ -430,35 +429,97 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
                       ),
                       child: Row(
                         children: [
-                          CountryCodePicker(
-                            onChanged: (countryCode) {
-                              setState(() {
-                                _countryCode = countryCode.dialCode ?? '+1';
-                              });
-                            },
-                            initialSelection: 'US',
-                            favorite: const ['+1', '+880', '+44', '+91'],
-                            showCountryOnly: false,
-                            showOnlyCountryWhenClosed: false,
-                            alignLeft: false,
-                            backgroundColor: AppColors.cardBackground,
-                            dialogBackgroundColor: AppColors.cardBackground,
-                            textStyle:
-                                const TextStyle(color: AppColors.whiteText),
-                            dialogTextStyle:
-                                const TextStyle(color: AppColors.whiteText),
-                            searchDecoration: InputDecoration(
-                              hintText: 'Search country',
-                              hintStyle: TextStyle(color: AppColors.greyText),
-                              fillColor: AppColors.darkBackground,
-                              filled: true,
-                              border: OutlineInputBorder(
-                                borderRadius: BorderRadius.circular(8),
-                                borderSide: BorderSide.none,
-                              ),
-                            ),
-                            searchStyle:
-                                const TextStyle(color: AppColors.whiteText),
+                          // Country Dropdown from API
+                          Expanded(
+                            flex:
+                                3, // Using 3 (approx 25-30%) because 2 (20%) is too small for "Country + Code"
+                            child: _isLoadingCountries
+                                ? Padding(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 16),
+                                    child: SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: AppColors.primaryGold,
+                                      ),
+                                    ),
+                                  )
+                                : Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 8),
+                                    child: DropdownButton<Country>(
+                                      value: _selectedCountry,
+                                      underline: const SizedBox(),
+                                      dropdownColor: AppColors.cardBackground,
+                                      isDense: true,
+                                      isExpanded: true,
+                                      menuMaxHeight: 400,
+                                      icon: const Icon(
+                                        Icons.arrow_drop_down,
+                                        color: AppColors.primaryGold,
+                                        size: 20,
+                                      ),
+                                      style: const TextStyle(
+                                        color: AppColors.whiteText,
+                                        fontSize: 14,
+                                      ),
+                                      selectedItemBuilder:
+                                          (BuildContext context) {
+                                        return _countries
+                                            .map((Country country) {
+                                          return Center(
+                                            child: Text(
+                                              '${country.name} ${country.phoneCode}',
+                                              style: const TextStyle(
+                                                color: AppColors.whiteText,
+                                                fontSize: 14,
+                                              ),
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                          );
+                                        }).toList();
+                                      },
+                                      items: _countries.map((Country country) {
+                                        return DropdownMenuItem<Country>(
+                                          value: country,
+                                          child: Row(
+                                            children: [
+                                              Expanded(
+                                                child: Text(
+                                                  country.name,
+                                                  style: const TextStyle(
+                                                    color: AppColors.whiteText,
+                                                    fontSize: 15,
+                                                  ),
+                                                  overflow:
+                                                      TextOverflow.ellipsis,
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Text(
+                                                country.phoneCode,
+                                                style: const TextStyle(
+                                                  color: AppColors.primaryGold,
+                                                  fontSize: 15,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        );
+                                      }).toList(),
+                                      onChanged: (Country? newCountry) {
+                                        if (newCountry != null) {
+                                          setState(() {
+                                            _selectedCountry = newCountry;
+                                            _countryCode = newCountry.phoneCode;
+                                          });
+                                        }
+                                      },
+                                    ),
+                                  ),
                           ),
                           Container(
                             height: 24,
@@ -467,6 +528,7 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
                           ),
                           const SizedBox(width: 12),
                           Expanded(
+                            flex: 7,
                             child: TextField(
                               controller: _phoneController,
                               keyboardType: TextInputType.phone,
@@ -474,7 +536,8 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
                                   const TextStyle(color: AppColors.whiteText),
                               decoration: const InputDecoration(
                                 border: InputBorder.none,
-                                hintText: null,
+                                hintText: 'Phone number',
+                                hintStyle: TextStyle(color: AppColors.greyText),
                               ),
                               onChanged: (value) {
                                 state.didChange(value);
@@ -682,33 +745,98 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
   }
 
   Future<void> _handleStepOneContinue() async {
-    if (_isStepOneSubmitting) return;
+    if (_isStepOneSubmitting) {
+      return;
+    }
 
     // Dismiss keyboard
     FocusScope.of(context).unfocus();
 
     setState(() {
       _isStepOneSubmitting = true;
+      // Clear previous errors
+      _firstNameError = null;
+      _lastNameError = null;
+      _emailError = null;
+      _phoneError = null;
+      _dobError = null;
+      _passwordError = null;
     });
 
     try {
-      final email = _emailController.text.trim();
-      final success = await AuthService().sendOtp(email);
+      // Format date of birth to ISO format (YYYY-MM-DD)
+      final formattedDob = _formatDateOfBirth(_dobController.text);
+      final phone = '$_countryCode${_phoneController.text.trim()}';
+
+      // Call validation API
+      final validationResponse = await AuthService().validateStep1(
+        firstName: _firstNameController.text.trim(),
+        lastName: _lastNameController.text.trim(),
+        email: _emailController.text.trim(),
+        phone: phone,
+        dateOfBirth: formattedDob,
+        password: _passwordController.text,
+        countryId: _selectedCountry?.id.toString(),
+      );
 
       if (!mounted) return;
 
-      setState(() {
-        _isStepOneSubmitting = false;
-      });
+      if (validationResponse.success) {
+        // Validation successful, proceed to send OTP
+        final email = _emailController.text.trim();
+        final success = await AuthService().sendOtp(email);
 
-      if (success) {
-        // Show success message at top and proceed to next step
-        _showBottomSnackBar('OTP sent successfully. Please check your email.',
-            AppColors.successGreen);
-        _nextStep();
+        if (!mounted) return;
+
+        setState(() {
+          _isStepOneSubmitting = false;
+        });
+
+        if (success) {
+          // Show success message at top and proceed to next step
+          _showBottomSnackBar('OTP sent successfully. Please check your email.',
+              AppColors.successGreen);
+          _nextStep();
+        } else {
+          _showBottomSnackBar(
+              'Failed to send OTP. Please try again.', AppColors.errorRed);
+        }
       } else {
-        _showBottomSnackBar(
-            'Failed to send OTP. Please try again.', AppColors.errorRed);
+        // Validation failed, show errors
+        setState(() {
+          _isStepOneSubmitting = false;
+
+          if (validationResponse.errors != null) {
+            final errors = validationResponse.errors!;
+
+            if (errors.containsKey('first_name')) {
+              _firstNameError = errors['first_name']!.first;
+            }
+            if (errors.containsKey('last_name')) {
+              _lastNameError = errors['last_name']!.first;
+            }
+            if (errors.containsKey('email')) {
+              _emailError = errors['email']!.first;
+            }
+            if (errors.containsKey('phone')) {
+              _phoneError = errors['phone']!.first;
+            }
+            if (errors.containsKey('date_of_birth')) {
+              _dobError = errors['date_of_birth']!.first;
+            }
+            if (errors.containsKey('password')) {
+              _passwordError = errors['password']!.first;
+            }
+            if (errors.containsKey('country_id')) {
+              _showBottomSnackBar(
+                  errors['country_id']!.first, AppColors.errorRed);
+            }
+          }
+        });
+
+        if (validationResponse.message != null) {
+          _showBottomSnackBar(validationResponse.message!, AppColors.errorRed);
+        }
       }
     } catch (e) {
       if (!mounted) return;
@@ -1769,123 +1897,125 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (context) => Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Upload Document',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: AppColors.whiteText,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Upload your $_selectedDocumentType',
-              style: const TextStyle(
-                fontSize: 14,
-                color: AppColors.greyText,
-              ),
-            ),
-            const SizedBox(height: 24),
-
-            // Take Photo option
-            ListTile(
-              leading: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: AppColors.primaryGold.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Icon(
-                  Icons.camera_alt,
-                  color: AppColors.primaryGold,
-                ),
-              ),
-              title: const Text(
-                'Take Photo',
+      builder: (context) => SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Upload Document',
                 style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
                   color: AppColors.whiteText,
-                  fontWeight: FontWeight.w600,
                 ),
               ),
-              subtitle: const Text(
-                'Use your camera to capture document',
-                style: TextStyle(color: AppColors.greyText, fontSize: 12),
+              const SizedBox(height: 8),
+              Text(
+                'Upload your $_selectedDocumentType',
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: AppColors.greyText,
+                ),
               ),
-              onTap: () {
-                Navigator.pop(context);
-                _pickImageFromCamera();
-              },
-            ),
-            const SizedBox(height: 8),
+              const SizedBox(height: 24),
 
-            // Choose from Gallery option
-            ListTile(
-              leading: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: AppColors.primaryGold.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
+              // Take Photo option
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryGold.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.camera_alt,
+                    color: AppColors.primaryGold,
+                  ),
                 ),
-                child: const Icon(
-                  Icons.photo_library,
-                  color: AppColors.primaryGold,
+                title: const Text(
+                  'Take Photo',
+                  style: TextStyle(
+                    color: AppColors.whiteText,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-              ),
-              title: const Text(
-                'Choose from Gallery',
-                style: TextStyle(
-                  color: AppColors.whiteText,
-                  fontWeight: FontWeight.w600,
+                subtitle: const Text(
+                  'Use your camera to capture document',
+                  style: TextStyle(color: AppColors.greyText, fontSize: 12),
                 ),
+                onTap: () {
+                  Navigator.pop(context);
+                  _pickImageFromCamera();
+                },
               ),
-              subtitle: const Text(
-                'Select JPG or PNG image',
-                style: TextStyle(color: AppColors.greyText, fontSize: 12),
-              ),
-              onTap: () {
-                Navigator.pop(context);
-                _pickImageFromGallery();
-              },
-            ),
-            const SizedBox(height: 8),
+              const SizedBox(height: 8),
 
-            // Select PDF option
-            ListTile(
-              leading: Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: AppColors.primaryGold.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
+              // Choose from Gallery option
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryGold.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.photo_library,
+                    color: AppColors.primaryGold,
+                  ),
                 ),
-                child: const Icon(
-                  Icons.picture_as_pdf,
-                  color: AppColors.primaryGold,
+                title: const Text(
+                  'Choose from Gallery',
+                  style: TextStyle(
+                    color: AppColors.whiteText,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-              ),
-              title: const Text(
-                'Select PDF File',
-                style: TextStyle(
-                  color: AppColors.whiteText,
-                  fontWeight: FontWeight.w600,
+                subtitle: const Text(
+                  'Select JPG or PNG image',
+                  style: TextStyle(color: AppColors.greyText, fontSize: 12),
                 ),
+                onTap: () {
+                  Navigator.pop(context);
+                  _pickImageFromGallery();
+                },
               ),
-              subtitle: const Text(
-                'Choose PDF document',
-                style: TextStyle(color: AppColors.greyText, fontSize: 12),
+              const SizedBox(height: 8),
+
+              // Select PDF option
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryGold.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.picture_as_pdf,
+                    color: AppColors.primaryGold,
+                  ),
+                ),
+                title: const Text(
+                  'Select PDF File',
+                  style: TextStyle(
+                    color: AppColors.whiteText,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                subtitle: const Text(
+                  'Choose PDF document',
+                  style: TextStyle(color: AppColors.greyText, fontSize: 12),
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+                  _pickPdfFile();
+                },
               ),
-              onTap: () {
-                Navigator.pop(context);
-                _pickPdfFile();
-              },
-            ),
-            const SizedBox(height: 16),
-          ],
+              const SizedBox(height: 16),
+            ],
+          ),
         ),
       ),
     );
@@ -2362,7 +2492,7 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
 
   bool _canProceedFromPersonalInfo() {
     // Check if all required fields are filled
-    return _firstNameController.text.trim().isNotEmpty &&
+    final isValid = _firstNameController.text.trim().isNotEmpty &&
         _lastNameController.text.trim().isNotEmpty &&
         _emailController.text.trim().isNotEmpty &&
         _phoneController.text.trim().isNotEmpty &&
@@ -2370,6 +2500,9 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
         _passwordController.text.trim().isNotEmpty &&
         _confirmPasswordController.text.trim().isNotEmpty &&
         _passwordController.text == _confirmPasswordController.text;
+
+    print('👉 _canProceedFromPersonalInfo: $isValid');
+    return isValid;
   }
 
   bool _canSubmit() {
