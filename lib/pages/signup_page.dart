@@ -2625,7 +2625,10 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
         // Toast removed as per request, relying on the one in LoginPage
 
         // Navigate to login page, replacing the signup page
-        Navigator.of(context).pushReplacementNamed('/login');
+        Navigator.of(context).pushReplacementNamed(
+          '/login',
+          arguments: {'registrationSuccess': true},
+        );
       } else {
         // Handle validation errors
         if (response.errors != null && response.errors!.isNotEmpty) {

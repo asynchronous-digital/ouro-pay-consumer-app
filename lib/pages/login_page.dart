@@ -50,6 +50,47 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
     _animationController.forward();
   }
 
+  bool _isInit = true;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_isInit) {
+      final args =
+          ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+      if (args != null && args['registrationSuccess'] == true) {
+        // Schedule the snackbar to show after the build
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.check_circle, color: AppColors.successGreen),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Text(
+                      'Registration is successful. Please use your credentials to sign in.',
+                      style: TextStyle(color: AppColors.whiteText),
+                    ),
+                  ),
+                ],
+              ),
+              backgroundColor: AppColors.cardBackground,
+              duration: const Duration(seconds: 5),
+              behavior: SnackBarBehavior.floating,
+              margin: const EdgeInsets.all(16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: const BorderSide(color: AppColors.successGreen, width: 2),
+              ),
+            ),
+          );
+        });
+      }
+      _isInit = false;
+    }
+  }
+
   @override
   void dispose() {
     _emailController.dispose();
