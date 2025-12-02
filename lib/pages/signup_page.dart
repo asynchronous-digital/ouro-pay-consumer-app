@@ -1458,7 +1458,16 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
                 SizedBox(
                   width: double.infinity,
                   child: OutlinedButton.icon(
-                    onPressed: _startSelfieCapture,
+                    onPressed: () {
+                      // Clear the previous selfie preview
+                      setState(() {
+                        _selfieCompleted = false;
+                        _selfieFile = null;
+                        _selfiePath = null;
+                      });
+                      // Then start new capture
+                      _startSelfieCapture();
+                    },
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.primaryGold,
                       side: const BorderSide(color: AppColors.primaryGold),
@@ -2070,6 +2079,7 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
 
   Future<void> _pickImageFromGallery() async {
     try {
+      print('📸 Starting image picker from gallery...');
       final XFile? image = await _imagePicker.pickImage(
         source: ImageSource.gallery,
         imageQuality: 85,
@@ -2077,11 +2087,16 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
         maxHeight: 1920,
       );
 
+      print(
+          '📸 Image picker result: ${image?.path ?? "null - user cancelled"}');
+
       if (image != null) {
+        print('📸 Image selected, starting compression...');
         // Compress image to ensure it's under 2MB
         final compressedFile = await _compressImage(File(image.path));
 
         if (compressedFile == null) {
+          print('❌ Compression failed - compressedFile is null');
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -2093,9 +2108,11 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
         }
 
         final fileSize = await compressedFile.length();
+        print('📸 Compressed file size: ${fileSize / 1024 / 1024} MB');
 
         // Check file size (max 2MB)
         if (fileSize > 2 * 1024 * 1024) {
+          print('❌ File too large: ${fileSize / 1024 / 1024} MB');
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -2106,6 +2123,7 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
           return;
         }
 
+        print('✅ Setting state with document file...');
         setState(() {
           _documentFile = compressedFile;
           _documentPath = compressedFile.path;
@@ -2114,10 +2132,14 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
 
         if (!mounted) return;
 
+        print('✅ Document selected successfully!');
         _showBottomSnackBar(
             'Document selected successfully!', AppColors.successGreen);
+      } else {
+        print('ℹ️ No image selected (user cancelled)');
       }
     } catch (e) {
+      print('❌ Error in _pickImageFromGallery: $e');
       if (!mounted) return;
       _showBottomSnackBar(
           'Error selecting image: ${e.toString()}', AppColors.errorRed);
@@ -2278,10 +2300,21 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
         maxHeight: 1920,
       );
 
-      if (image == null) return;
+      if (image == null) {
+        return;
+      }
 
-      // 3. Process image for face detection
-      final inputImage = InputImage.fromFilePath(image.path);
+      // IMPORTANT: Compress/fix image BEFORE face detection
+      // This ensures the image is in the correct orientation and format for ML Kit
+      final compressedSelfie = await _compressImage(File(image.path));
+
+      if (compressedSelfie == null) {
+        _showError('Failed to process selfie image');
+        return;
+      }
+
+      // 3. Process image for face detection (using the compressed/fixed image)
+      final inputImage = InputImage.fromFilePath(compressedSelfie.path);
       final options = FaceDetectorOptions(
         enableClassification: true, // For eyes open/smile
         enableLandmarks: true, // For detailed positioning if needed
@@ -2326,25 +2359,14 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
       }
 
       // Check eyes open probability (detect blinking or sunglasses)
-      // Note: Probability is null if classification is not enabled or detection failed
       final double? leftEyeOpen = face.leftEyeOpenProbability;
       final double? rightEyeOpen = face.rightEyeOpenProbability;
 
       if (leftEyeOpen != null && rightEyeOpen != null) {
         if (leftEyeOpen < 0.5 || rightEyeOpen < 0.5) {
-          _showError(
-              'Eyes not clearly visible. Please remove sunglasses and don\'t blink.');
+          _showError('Please keep your eyes open and don\'t blink.');
           return;
         }
-      }
-
-      // 5. Success - Compress and save the selfie
-      // Compress the selfie image
-      final compressedSelfie = await _compressImage(File(image.path));
-
-      if (compressedSelfie == null) {
-        _showError('Failed to process selfie image');
-        return;
       }
 
       setState(() {
@@ -2357,6 +2379,7 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
       _showBottomSnackBar(
           'Selfie verified successfully!', AppColors.successGreen);
     } catch (e) {
+      print('❌ Error in selfie capture: $e');
       if (!mounted) return;
       _showError('Error processing selfie: ${e.toString()}');
     }
@@ -2601,8 +2624,8 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
         // Show success toast message
         // Toast removed as per request, relying on the one in LoginPage
 
-        // Navigate back to login page
-        Navigator.of(context).pop(true);
+        // Navigate to login page, replacing the signup page
+        Navigator.of(context).pushReplacementNamed('/login');
       } else {
         // Handle validation errors
         if (response.errors != null && response.errors!.isNotEmpty) {
