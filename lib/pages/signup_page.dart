@@ -48,16 +48,19 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
 
   // KYC state
   // Removed static selected country; will be set dynamically
-  String _selectedDocumentType = 'Passport';
-  bool _documentsUploaded = false;
+  String _selectedDocumentType = 'National ID';
+  bool _documentFrontUploaded = false;
+  bool _documentBackUploaded = false;
   bool _selfieCompleted = false;
   bool _termsAccepted = false;
   bool _isStepOneSubmitting = false;
   bool _isOtpSubmitting = false;
 
-  // Document file (single upload - PDF or photo)
-  File? _documentFile;
-  String? _documentPath;
+  // Document files (front and back)
+  File? _documentFrontFile;
+  String? _documentFrontPath;
+  File? _documentBackFile;
+  String? _documentBackPath;
   File? _selfieFile;
   String? _selfiePath;
   final ImagePicker _imagePicker = ImagePicker();
@@ -1077,7 +1080,7 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
           ),
           const SizedBox(height: 8),
           const Text(
-            'Upload a government-issued ID to verify your identity. This helps us keep your account secure.',
+            'Upload your National ID to verify your identity.',
             style: TextStyle(
               fontSize: 16,
               color: AppColors.greyText,
@@ -1165,7 +1168,7 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
                 ),
           const SizedBox(height: 24),
 
-          // Document Type Selection
+          // Document Type Selection (Re-enabled all options)
           const Text(
             'Document Type',
             style: TextStyle(
@@ -1187,114 +1190,8 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
 
           const SizedBox(height: 32),
 
-          // Document Upload Area
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: AppColors.cardBackground,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: _documentsUploaded
-                    ? AppColors.successGreen
-                    : AppColors.greyText.withOpacity(0.3),
-                width: 2,
-                style: BorderStyle.solid,
-              ),
-            ),
-            child: Column(
-              children: [
-                Icon(
-                  _documentsUploaded ? Icons.check_circle : Icons.upload_file,
-                  size: 48,
-                  color: _documentsUploaded
-                      ? AppColors.successGreen
-                      : AppColors.primaryGold,
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  _documentsUploaded
-                      ? 'Document uploaded successfully!'
-                      : 'Upload $_selectedDocumentType',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: _documentsUploaded
-                        ? AppColors.successGreen
-                        : AppColors.whiteText,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Select PDF, JPG, PNG or take a photo',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: AppColors.greyText,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 4),
-                const Text(
-                  'Maximum file size: 2MB',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppColors.primaryGold,
-                    fontWeight: FontWeight.w600,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-
-                // Show uploaded file
-                if (_documentFile != null) ...[
-                  const SizedBox(height: 24),
-                  const Divider(color: AppColors.greyText),
-                  const SizedBox(height: 16),
-
-                  // Document preview
-                  _buildDocumentPreview(
-                    'Document',
-                    _documentPath!,
-                    _documentFile!,
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // Reset button
-                  TextButton.icon(
-                    onPressed: () {
-                      setState(() {
-                        _documentFile = null;
-                        _documentPath = null;
-                        _documentsUploaded = false;
-                      });
-                    },
-                    icon: const Icon(Icons.refresh, color: AppColors.errorRed),
-                    label: const Text(
-                      'Reset and Upload Again',
-                      style: TextStyle(color: AppColors.errorRed),
-                    ),
-                  ),
-                ],
-
-                const SizedBox(height: 16),
-                if (!_documentsUploaded)
-                  ElevatedButton.icon(
-                    onPressed: _startDocumentCapture,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primaryGold,
-                      foregroundColor: AppColors.darkBackground,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 12,
-                      ),
-                    ),
-                    icon: const Icon(Icons.upload_file),
-                    label: const Text('Upload Document'),
-                  ),
-              ],
-            ),
-          ),
+          // Dynamic Upload Section
+          _buildDynamicUploadSection(),
 
           const SizedBox(height: 32),
 
@@ -1302,7 +1199,8 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: (_documentsUploaded &&
+              onPressed: (_documentFrontUploaded &&
+                      _documentBackUploaded &&
                       !_isLoadingCountries &&
                       _selectedCountry != null)
                   ? _nextStep
@@ -1332,6 +1230,186 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
                         fontWeight: FontWeight.bold,
                       ),
                     ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDynamicUploadSection() {
+    // Stage 1: Upload Front
+    if (!_documentFrontUploaded) {
+      return _buildSingleUploadBox(
+        label: 'Front Side',
+        isBackSide: false,
+        header: 'Upload $_selectedDocumentType Front',
+      );
+    }
+    // Stage 2: Upload Back
+    else if (!_documentBackUploaded) {
+      return Column(
+        children: [
+          _buildCompactPreview(
+              'Front Side', _documentFrontPath!, _documentFrontFile!),
+          const SizedBox(height: 24),
+          _buildSingleUploadBox(
+            label: 'Back Side',
+            isBackSide: true,
+            header: 'Now please select the back side',
+          ),
+        ],
+      );
+    }
+    // Stage 3: Both Uploaded
+    else {
+      return Column(
+        children: [
+          _buildCompactPreview(
+              'Front Side', _documentFrontPath!, _documentFrontFile!),
+          const SizedBox(height: 16),
+          _buildCompactPreview(
+              'Back Side', _documentBackPath!, _documentBackFile!),
+          const SizedBox(height: 24),
+          TextButton.icon(
+            onPressed: () {
+              setState(() {
+                _documentFrontFile = null;
+                _documentFrontPath = null;
+                _documentFrontUploaded = false;
+                _documentBackFile = null;
+                _documentBackPath = null;
+                _documentBackUploaded = false;
+              });
+            },
+            icon: const Icon(Icons.refresh, color: AppColors.errorRed),
+            label: const Text(
+              'Reset and Upload Again',
+              style: TextStyle(color: AppColors.errorRed),
+            ),
+          ),
+        ],
+      );
+    }
+  }
+
+  Widget _buildSingleUploadBox({
+    required String label,
+    required bool isBackSide,
+    required String header,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: AppColors.cardBackground,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppColors.greyText.withOpacity(0.3),
+          width: 2,
+          style: BorderStyle.solid,
+        ),
+      ),
+      child: Column(
+        children: [
+          const Icon(
+            Icons.upload_file,
+            size: 48,
+            color: AppColors.primaryGold,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            header,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: AppColors.whiteText,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Select JPG, PNG or take a photo',
+            style: TextStyle(
+              fontSize: 14,
+              color: AppColors.greyText,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Maximum file size: 2MB',
+            style: TextStyle(
+              fontSize: 12,
+              color: AppColors.primaryGold,
+              fontWeight: FontWeight.w600,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton.icon(
+            onPressed: () => _startDocumentCapture(isBackSide: isBackSide),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primaryGold,
+              foregroundColor: AppColors.darkBackground,
+              padding: const EdgeInsets.symmetric(
+                horizontal: 24,
+                vertical: 12,
+              ),
+            ),
+            icon: const Icon(Icons.upload_file),
+            label: Text('Upload $label'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCompactPreview(String label, String path, File file) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.cardBackground,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: AppColors.successGreen,
+        ),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.check_circle, color: AppColors.successGreen),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    color: AppColors.whiteText,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Text(
+                  path.split('/').last,
+                  style:
+                      const TextStyle(color: AppColors.greyText, fontSize: 12),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          // Preview snippet (optional)
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(4),
+              image: DecorationImage(
+                image: FileImage(file),
+                fit: BoxFit.cover,
+              ),
             ),
           ),
         ],
@@ -1610,7 +1688,7 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
             [
               'Country: ${_selectedCountry?.name ?? "Not selected"}',
               'Document Type: $_selectedDocumentType',
-              'Document Status: ${_documentsUploaded ? "Uploaded ✓" : "Pending"}',
+              'Document Status: ${_documentFrontUploaded && _documentBackUploaded ? "Uploaded ✓" : "Pending"}',
               'Selfie Status: ${_selfieCompleted ? "Completed ✓" : "Pending"}',
             ],
           ),
@@ -1898,7 +1976,7 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
     }
   }
 
-  Future<void> _startDocumentCapture() async {
+  Future<void> _startDocumentCapture({required bool isBackSide}) async {
     // Show options for document upload
     showModalBottomSheet(
       context: context,
@@ -1913,9 +1991,9 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Upload Document',
-                style: TextStyle(
+              Text(
+                'Upload ${isBackSide ? "Back Side" : "Front Side"}',
+                style: const TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
                   color: AppColors.whiteText,
@@ -1923,7 +2001,7 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
               ),
               const SizedBox(height: 8),
               Text(
-                'Upload your $_selectedDocumentType',
+                'Upload your $_selectedDocumentType (${isBackSide ? "Back" : "Front"})',
                 style: const TextStyle(
                   fontSize: 14,
                   color: AppColors.greyText,
@@ -1957,7 +2035,7 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
                 ),
                 onTap: () {
                   Navigator.pop(context);
-                  _pickImageFromCamera();
+                  _pickImageFromCamera(isBackSide: isBackSide);
                 },
               ),
               const SizedBox(height: 8),
@@ -1988,7 +2066,7 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
                 ),
                 onTap: () {
                   Navigator.pop(context);
-                  _pickImageFromGallery();
+                  _pickImageFromGallery(isBackSide: isBackSide);
                 },
               ),
               const SizedBox(height: 8),
@@ -2019,7 +2097,7 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
                 ),
                 onTap: () {
                   Navigator.pop(context);
-                  _pickPdfFile();
+                  _pickPdfFile(isBackSide: isBackSide);
                 },
               ),
               const SizedBox(height: 16),
@@ -2030,7 +2108,7 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
     );
   }
 
-  Future<void> _pickImageFromCamera() async {
+  Future<void> _pickImageFromCamera({required bool isBackSide}) async {
     try {
       final XFile? image = await _imagePicker.pickImage(
         source: ImageSource.camera,
@@ -2060,9 +2138,15 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
         }
 
         setState(() {
-          _documentFile = compressedFile;
-          _documentPath = compressedFile.path;
-          _documentsUploaded = true;
+          if (isBackSide) {
+            _documentBackFile = compressedFile;
+            _documentBackPath = compressedFile.path;
+            _documentBackUploaded = true;
+          } else {
+            _documentFrontFile = compressedFile;
+            _documentFrontPath = compressedFile.path;
+            _documentFrontUploaded = true;
+          }
         });
 
         if (!mounted) return;
@@ -2077,7 +2161,7 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
     }
   }
 
-  Future<void> _pickImageFromGallery() async {
+  Future<void> _pickImageFromGallery({required bool isBackSide}) async {
     try {
       print('📸 Starting image picker from gallery...');
       final XFile? image = await _imagePicker.pickImage(
@@ -2125,9 +2209,15 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
 
         print('✅ Setting state with document file...');
         setState(() {
-          _documentFile = compressedFile;
-          _documentPath = compressedFile.path;
-          _documentsUploaded = true;
+          if (isBackSide) {
+            _documentBackFile = compressedFile;
+            _documentBackPath = compressedFile.path;
+            _documentBackUploaded = true;
+          } else {
+            _documentFrontFile = compressedFile;
+            _documentFrontPath = compressedFile.path;
+            _documentFrontUploaded = true;
+          }
         });
 
         if (!mounted) return;
@@ -2146,7 +2236,7 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
     }
   }
 
-  Future<void> _pickPdfFile() async {
+  Future<void> _pickPdfFile({required bool isBackSide}) async {
     try {
       FilePickerResult? result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
@@ -2170,9 +2260,15 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
         }
 
         setState(() {
-          _documentFile = file;
-          _documentPath = result.files.single.path;
-          _documentsUploaded = true;
+          if (isBackSide) {
+            _documentBackFile = file;
+            _documentBackPath = result.files.single.path;
+            _documentBackUploaded = true;
+          } else {
+            _documentFrontFile = file;
+            _documentFrontPath = result.files.single.path;
+            _documentFrontUploaded = true;
+          }
         });
 
         if (!mounted) return;
@@ -2401,85 +2497,6 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
     _showBottomSnackBar(message, AppColors.errorRed);
   }
 
-  Widget _buildDocumentPreview(String label, String path, File file) {
-    final isPdf = path.toLowerCase().endsWith('.pdf');
-    final fileName = path.split('/').last;
-
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.darkBackground,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.primaryGold.withOpacity(0.3)),
-      ),
-      child: Row(
-        children: [
-          // Preview or icon
-          Container(
-            width: 60,
-            height: 60,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(8),
-              color: AppColors.cardBackground,
-            ),
-            child: isPdf
-                ? const Icon(
-                    Icons.picture_as_pdf,
-                    color: AppColors.errorRed,
-                    size: 32,
-                  )
-                : ClipRRect(
-                    borderRadius: BorderRadius.circular(8),
-                    child: Image.file(
-                      file,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return const Icon(
-                          Icons.image,
-                          color: AppColors.greyText,
-                          size: 32,
-                        );
-                      },
-                    ),
-                  ),
-          ),
-          const SizedBox(width: 12),
-          // File info
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: const TextStyle(
-                    color: AppColors.whiteText,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  fileName,
-                  style: const TextStyle(
-                    color: AppColors.greyText,
-                    fontSize: 12,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-          const Icon(
-            Icons.check_circle,
-            color: AppColors.successGreen,
-            size: 24,
-          ),
-        ],
-      ),
-    );
-  }
-
   Future<void> _fetchCountries() async {
     setState(() {
       _isLoadingCountries = true;
@@ -2529,21 +2546,15 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
   }
 
   bool _canSubmit() {
-    return _documentsUploaded && _selfieCompleted && _termsAccepted;
+    return _documentFrontUploaded &&
+        _documentBackUploaded &&
+        _selfieCompleted &&
+        _termsAccepted;
   }
 
   String _getDocumentTypeForApi() {
-    // Map UI document type to API format
-    switch (_selectedDocumentType) {
-      case 'Passport':
-        return 'passport';
-      case 'Driver\'s License':
-        return 'drivers_license';
-      case 'National ID':
-        return 'national_id';
-      default:
-        return 'passport';
-    }
+    // Return national_id specifically for now
+    return 'national_id';
   }
 
   Future<void> _submitRegistration() async {
@@ -2553,18 +2564,23 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
       return;
     }
 
-    if (_documentFile == null || _documentPath == null) {
-      _showError('Please upload your identity document');
+    if (_documentFrontFile == null || _documentFrontPath == null) {
+      _showError('Please upload front side of your document');
       return;
     }
 
-    if (_selfieFile == null || _selfiePath == null) {
+    if (_documentBackFile == null || _documentBackPath == null) {
+      _showError('Please upload back side of your document');
+      return;
+    }
+
+    if (!_selfieCompleted || _selfiePath == null) {
       _showError('Please complete selfie verification');
       return;
     }
 
     if (!_termsAccepted) {
-      _showError('Please accept the terms and conditions');
+      _showError('Please accept the Terms and Conditions');
       return;
     }
 
@@ -2608,7 +2624,8 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
         otp: '000000', // Fixed OTP as per requirement
         countryId: _selectedCountry!.id,
         documentType: _getDocumentTypeForApi(),
-        documentPath: _documentPath!,
+        documentFrontPath: _documentFrontPath!,
+        documentBackPath: _documentBackPath!,
         selfiePath: _selfiePath!,
       );
 
@@ -2733,7 +2750,7 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
           TextButton(
             onPressed: () {
               Navigator.of(context).pop();
-              _resetForm();
+              // Do not reset form on general error so user can retry
             },
             child: const Text(
               'OK',
@@ -2756,9 +2773,12 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
     _otpController.clear();
 
     setState(() {
-      _documentFile = null;
-      _documentPath = null;
-      _documentsUploaded = false;
+      _documentFrontFile = null;
+      _documentFrontPath = null;
+      _documentFrontUploaded = false;
+      _documentBackFile = null;
+      _documentBackPath = null;
+      _documentBackUploaded = false;
       _selfieFile = null;
       _selfiePath = null;
       _selfieCompleted = false;
