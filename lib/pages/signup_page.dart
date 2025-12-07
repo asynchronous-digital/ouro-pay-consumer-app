@@ -73,6 +73,8 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
   List<Country> _countries = [];
   bool _isLoadingCountries = false;
   Country? _selectedCountry;
+  bool _hasSelectedCountry =
+      false; // Track if user has manually selected a country
 
   // Country code for phone number
   String _countryCode = '+1'; // Default to US
@@ -474,7 +476,9 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
                                             .map((Country country) {
                                           return Center(
                                             child: Text(
-                                              '${country.name} ${country.phoneCode}',
+                                              _hasSelectedCountry
+                                                  ? country.phoneCode
+                                                  : country.name,
                                               style: const TextStyle(
                                                 color: AppColors.whiteText,
                                                 fontSize: 14,
@@ -518,6 +522,8 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
                                           setState(() {
                                             _selectedCountry = newCountry;
                                             _countryCode = newCountry.phoneCode;
+                                            _hasSelectedCountry =
+                                                true; // Mark that user has selected
                                           });
                                         }
                                       },
