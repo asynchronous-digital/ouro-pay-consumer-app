@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:ouro_pay_consumer_app/theme/app_theme.dart';
 import 'package:ouro_pay_consumer_app/models/deposit.dart';
 import 'package:ouro_pay_consumer_app/services/deposit_service.dart';
+import 'package:ouro_pay_consumer_app/services/auth_service.dart';
+import 'package:ouro_pay_consumer_app/pages/add_money_page.dart';
 
 class DepositHistoryPage extends StatefulWidget {
   final String? currency;
@@ -17,11 +19,28 @@ class _DepositHistoryPageState extends State<DepositHistoryPage> {
   List<Deposit> _deposits = [];
   bool _isLoading = false;
   String? _errorMessage;
+  bool _isKycApproved = false;
 
   @override
   void initState() {
     super.initState();
     _loadDeposits();
+    _loadKycStatus();
+  }
+
+  Future<void> _loadKycStatus() async {
+    try {
+      final authService = AuthService();
+      final response = await authService.getUserProfile();
+      if (mounted) {
+        setState(() {
+          _isKycApproved =
+              response.data?.authorization.kycStatus.isApproved ?? false;
+        });
+      }
+    } catch (e) {
+      print('Error loading KYC status: $e');
+    }
   }
 
   Future<void> _loadDeposits() async {
@@ -163,7 +182,35 @@ class _DepositHistoryPageState extends State<DepositHistoryPage> {
                         },
                       ),
                     ),
+      floatingActionButton: _isKycApproved
+          ? FloatingActionButton.extended(
+              onPressed: _handleAddMoney,
+              backgroundColor: AppColors.primaryGold,
+              icon: const Icon(Icons.add, color: AppColors.darkBackground),
+              label: const Text(
+                'Add Money',
+                style: TextStyle(
+                  color: AppColors.darkBackground,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            )
+          : null,
     );
+  }
+
+  void _handleAddMoney() async {
+    // Navigate to add money page (KYC already checked before showing button)
+    final result = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const AddMoneyPage(),
+      ),
+    );
+    // Refresh if money was added
+    if (result == true && mounted) {
+      _loadDeposits();
+    }
   }
 
   Widget _buildDepositCard(Deposit deposit) {

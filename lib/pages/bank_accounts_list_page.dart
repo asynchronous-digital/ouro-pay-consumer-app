@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:ouro_pay_consumer_app/models/bank_account.dart';
 import 'package:ouro_pay_consumer_app/services/bank_service.dart';
+import 'package:ouro_pay_consumer_app/services/auth_service.dart';
 import 'package:ouro_pay_consumer_app/theme/app_theme.dart';
 import 'package:ouro_pay_consumer_app/pages/add_bank_account_page.dart';
 
@@ -14,11 +15,28 @@ class BankAccountsListPage extends StatefulWidget {
 class _BankAccountsListPageState extends State<BankAccountsListPage> {
   final BankService _bankService = BankService();
   late Future<List<BankAccount>> _accountsFuture;
+  bool _isKycApproved = false;
 
   @override
   void initState() {
     super.initState();
     _loadAccounts();
+    _loadKycStatus();
+  }
+
+  Future<void> _loadKycStatus() async {
+    try {
+      final authService = AuthService();
+      final response = await authService.getUserProfile();
+      if (mounted) {
+        setState(() {
+          _isKycApproved =
+              response.data?.authorization.kycStatus.isApproved ?? false;
+        });
+      }
+    } catch (e) {
+      print('Error loading KYC status: $e');
+    }
   }
 
   void _loadAccounts() {
@@ -245,19 +263,32 @@ class _BankAccountsListPageState extends State<BankAccountsListPage> {
           );
         },
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () async {
-          final result = await Navigator.push(
-            context,
-            MaterialPageRoute(builder: (context) => const AddBankAccountPage()),
-          );
-          if (result == true) {
-            _loadAccounts();
-          }
-        },
-        backgroundColor: AppColors.primaryGold,
-        child: const Icon(Icons.add, color: AppColors.darkBackground),
-      ),
+      floatingActionButton: _isKycApproved
+          ? FloatingActionButton.extended(
+              onPressed: _handleAddBankAccount,
+              backgroundColor: AppColors.primaryGold,
+              icon: const Icon(Icons.account_balance,
+                  color: AppColors.darkBackground),
+              label: const Text(
+                'Add Bank',
+                style: TextStyle(
+                  color: AppColors.darkBackground,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            )
+          : null,
     );
+  }
+
+  void _handleAddBankAccount() async {
+    // Navigate to add bank account page (KYC already checked before showing button)
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const AddBankAccountPage()),
+    );
+    if (result == true) {
+      _loadAccounts();
+    }
   }
 }
