@@ -34,7 +34,7 @@ class BankAccount {
       iban: json['iban'] ?? '',
       currency:
           json['currency'] != null ? Currency.fromJson(json['currency']) : null,
-      isDefault: json['is_default'] ?? false,
+      isDefault: json['is_default'] ?? json['is_primary'] ?? false,
       createdAt: json['created_at'] ?? '',
     );
   }

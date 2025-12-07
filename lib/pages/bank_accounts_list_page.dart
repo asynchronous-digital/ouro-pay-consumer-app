@@ -28,10 +28,22 @@ class _BankAccountsListPageState extends State<BankAccountsListPage> {
   }
 
   Future<void> _deleteAccount(int id) async {
+    // Show loading dialog
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(color: AppColors.primaryGold),
+      ),
+    );
+
     try {
       final success = await _bankService.deleteBankAccount(id);
+
+      if (!mounted) return;
+      Navigator.pop(context); // Close loading dialog
+
       if (success) {
-        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Bank account deleted successfully'),
@@ -42,6 +54,8 @@ class _BankAccountsListPageState extends State<BankAccountsListPage> {
       }
     } catch (e) {
       if (!mounted) return;
+      Navigator.pop(context); // Close loading dialog
+
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('${e.toString().replaceAll("Exception:", "")}'),
