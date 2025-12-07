@@ -357,7 +357,8 @@ class AuthService {
     required String otp,
     required int countryId,
     required String documentType,
-    required String documentPath,
+    required String documentFrontPath,
+    required String documentBackPath,
     required String selfiePath,
   }) async {
     try {
@@ -397,13 +398,21 @@ class AuthService {
       print('   country_id: $countryId');
       print('   document_type: $documentType');
 
-      // Add document file
-      var documentFile = await http.MultipartFile.fromPath(
-        'document',
-        documentPath,
+      // Add document front file
+      var documentFrontFile = await http.MultipartFile.fromPath(
+        'document_front',
+        documentFrontPath,
       );
-      request.files.add(documentFile);
-      print('   document: ${documentPath.split('/').last}');
+      request.files.add(documentFrontFile);
+      print('   document_front: ${documentFrontPath.split('/').last}');
+
+      // Add document back file
+      var documentBackFile = await http.MultipartFile.fromPath(
+        'document_back',
+        documentBackPath,
+      );
+      request.files.add(documentBackFile);
+      print('   document_back: ${documentBackPath.split('/').last}');
 
       // Add selfie file
       var selfieFile = await http.MultipartFile.fromPath(

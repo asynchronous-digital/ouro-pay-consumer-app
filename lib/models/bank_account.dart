@@ -1,58 +1,70 @@
 class BankAccount {
-  final String id;
-  final String accountHolderName;
+  final int id;
   final String bankName;
+  final String accountHolderName;
   final String accountNumber;
-  final String routingNumber;
-  final String status; // 'verified', 'pending', 'unverified'
+  final String accountNumberFull;
+  final String swiftCode;
+  final String iban;
+  final Currency? currency;
+  final bool isDefault;
+  final String createdAt;
 
-  const BankAccount({
+  BankAccount({
     required this.id,
-    required this.accountHolderName,
     required this.bankName,
+    required this.accountHolderName,
     required this.accountNumber,
-    required this.routingNumber,
-    required this.status,
+    required this.accountNumberFull,
+    required this.swiftCode,
+    required this.iban,
+    this.currency,
+    required this.isDefault,
+    required this.createdAt,
   });
-
-  bool get isVerified => status == 'verified';
-
-  String get maskedAccountNumber {
-    if (accountNumber.length <= 4) return accountNumber;
-    return '****${accountNumber.substring(accountNumber.length - 4)}';
-  }
 
   factory BankAccount.fromJson(Map<String, dynamic> json) {
     return BankAccount(
-      id: json['id'] as String,
-      accountHolderName: json['account_holder_name'] as String,
-      bankName: json['bank_name'] as String,
-      accountNumber: json['account_number'] as String,
-      routingNumber: json['routing_number'] as String,
-      status: json['status'] as String,
+      id: json['id'] is int ? json['id'] : int.parse(json['id'].toString()),
+      bankName: json['bank_name'] ?? '',
+      accountHolderName: json['account_holder_name'] ?? '',
+      accountNumber: json['account_number'] ?? '',
+      accountNumberFull: json['account_number_full'] ?? '',
+      swiftCode: json['swift_code'] ?? '',
+      iban: json['iban'] ?? '',
+      currency:
+          json['currency'] != null ? Currency.fromJson(json['currency']) : null,
+      isDefault: json['is_default'] ?? json['is_primary'] ?? false,
+      createdAt: json['created_at'] ?? '',
     );
   }
 
-  Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'account_holder_name': accountHolderName,
-      'bank_name': bankName,
-      'account_number': accountNumber,
-      'routing_number': routingNumber,
-      'status': status,
-    };
-  }
+  // Compatibility getters for existing UI
+  String get maskedAccountNumber => accountNumber;
+  String get routingNumber => swiftCode;
+  String get status => 'verified';
+  bool get isVerified => true;
+}
 
-  // Dummy data for testing
-  factory BankAccount.dummy() {
-    return const BankAccount(
-      id: '1',
-      accountHolderName: 'John Doe',
-      bankName: 'Chase Bank',
-      accountNumber: '1234567890',
-      routingNumber: '987654321',
-      status: 'verified',
+class Currency {
+  final int id;
+  final String code;
+  final String name;
+  final String symbol;
+
+  Currency({
+    required this.id,
+    required this.code,
+    required this.name,
+    required this.symbol,
+  });
+
+  factory Currency.fromJson(Map<String, dynamic> json) {
+    return Currency(
+      id: json['id'] is int ? json['id'] : int.parse(json['id'].toString()),
+      code: json['code'] ?? '',
+      name: json['name'] ?? '',
+      symbol: json['symbol'] ?? '',
     );
   }
 }
