@@ -120,6 +120,7 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
                 position: _slideAnimation,
                 child: Form(
                   key: _formKey,
+                  autovalidateMode: AutovalidateMode.always,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
