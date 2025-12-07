@@ -53,8 +53,16 @@ class _WithdrawFundsPageState extends State<WithdrawFundsPage> {
       if (walletResponse.success &&
           walletResponse.wallets != null &&
           walletResponse.wallets!.isNotEmpty) {
-        _wallets = walletResponse.wallets!;
-        _selectedWallet = _wallets.first; // Default to first
+        // Filter wallets to show only those with available balance > 0
+        _wallets = walletResponse.wallets!
+            .where((wallet) => wallet.availableBalance > 0)
+            .toList();
+        
+        if (_wallets.isNotEmpty) {
+          _selectedWallet = _wallets.first; // Default to first wallet with balance
+        } else {
+          _selectedWallet = null;
+        }
       } else {
         // Fallback if needed or handle empty
       }
@@ -74,20 +82,6 @@ class _WithdrawFundsPageState extends State<WithdrawFundsPage> {
         }
       } else if (_bankAccounts.isNotEmpty) {
         _selectedBankAccount = _bankAccounts.first;
-      }
-
-      // Auto-select matching wallet
-      if (_selectedBankAccount != null &&
-          _selectedBankAccount!.currency?.code != null) {
-        try {
-          final matchingWallet = _wallets.firstWhere(
-              (w) => w.currencyCode == _selectedBankAccount!.currency!.code);
-          _selectedWallet = matchingWallet;
-        } catch (_) {
-          // If no matching wallet, user might need to know, but for now we just keep the default or null
-          // We can optionally set _selectedWallet to null if strict matching is required
-          _selectedWallet = null;
-        }
       }
     } catch (e) {
       _errorMessage = e.toString().replaceAll("Exception:", "");
@@ -275,54 +269,78 @@ class _WithdrawFundsPageState extends State<WithdrawFundsPage> {
                       ),
                     ),
                     const SizedBox(height: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      decoration: BoxDecoration(
-                        color: AppColors.cardBackground,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppColors.greyText),
-                      ),
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<WalletData>(
-                          value: _selectedWallet,
-                          dropdownColor: AppColors.cardBackground,
-                          icon: _selectedBankAccount != null
-                              ? const SizedBox.shrink()
-                              : const Icon(Icons.keyboard_arrow_down,
-                                  color: AppColors.primaryGold),
-                          isExpanded: true,
-                          items: _wallets.map((wallet) {
-                            return DropdownMenuItem(
-                              value: wallet,
-                              child: Row(
-                                children: [
-                                  Text(
-                                    wallet.currencyCode,
-                                    style: const TextStyle(
-                                      color: AppColors.whiteText,
-                                      fontWeight: FontWeight.bold,
+                    
+                    if (_wallets.isEmpty)
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: AppColors.cardBackground,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppColors.warningOrange),
+                        ),
+                        child: const Text(
+                          "No wallets with available balance found. Please deposit funds first.",
+                          style: TextStyle(color: AppColors.whiteText),
+                        ),
+                      )
+                    else
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        decoration: BoxDecoration(
+                          color: AppColors.cardBackground,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppColors.greyText),
+                        ),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<WalletData>(
+                            value: _selectedWallet,
+                            dropdownColor: AppColors.cardBackground,
+                            icon: const Icon(Icons.keyboard_arrow_down,
+                                color: AppColors.primaryGold),
+                            isExpanded: true,
+                            items: _wallets.map((wallet) {
+                              return DropdownMenuItem(
+                                value: wallet,
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Row(
+                                      children: [
+                                        Text(
+                                          wallet.currencyCode,
+                                          style: const TextStyle(
+                                            color: AppColors.whiteText,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          '- ${wallet.currencyName}',
+                                          style: const TextStyle(
+                                              color: AppColors.greyText),
+                                        ),
+                                      ],
                                     ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    '- ${wallet.currencyName}',
-                                    style: const TextStyle(
-                                        color: AppColors.greyText),
-                                  ),
-                                ],
-                              ),
-                            );
-                          }).toList(),
-                          onChanged: _selectedBankAccount != null
-                              ? null // Lock wallet selection when bank is selected
-                              : (WalletData? newValue) {
-                                  setState(() {
-                                    _selectedWallet = newValue;
-                                  });
-                                },
+                                    Text(
+                                      wallet.formattedAvailableBalance,
+                                      style: const TextStyle(
+                                        color: AppColors.primaryGold,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            }).toList(),
+                            onChanged: (WalletData? newValue) {
+                              setState(() {
+                                _selectedWallet = newValue;
+                              });
+                            },
+                          ),
                         ),
                       ),
-                    ),
                     const SizedBox(height: 24),
 
                     // Balance Card
@@ -416,29 +434,6 @@ class _WithdrawFundsPageState extends State<WithdrawFundsPage> {
                               onChanged: (val) {
                                 setState(() {
                                   _selectedBankAccount = val;
-
-                                  if (val != null) {
-                                    final bankCurrency = val.currency?.code;
-                                    if (bankCurrency != null) {
-                                      try {
-                                        final matchingWallet =
-                                            _wallets.firstWhere(
-                                          (w) => w.currencyCode == bankCurrency,
-                                        );
-                                        _selectedWallet = matchingWallet;
-                                      } catch (_) {
-                                        _selectedWallet = null;
-                                        ScaffoldMessenger.of(context)
-                                            .showSnackBar(
-                                          SnackBar(
-                                            content: Text(
-                                                'No $bankCurrency wallet found for this bank account'),
-                                            backgroundColor: AppColors.errorRed,
-                                          ),
-                                        );
-                                      }
-                                    }
-                                  }
                                 });
                               }),
                         ),

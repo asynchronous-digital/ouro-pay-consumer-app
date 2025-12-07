@@ -18,6 +18,7 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
   bool _isPasswordVisible = false;
   bool _isLoading = false;
   bool _rememberMe = false;
+  bool _isFormValid = false;
 
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
@@ -48,6 +49,10 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
     ));
 
     _animationController.forward();
+
+    // Add listeners to check form validity
+    _emailController.addListener(_checkFormValidity);
+    _passwordController.addListener(_checkFormValidity);
   }
 
   bool _isInit = true;
@@ -247,7 +252,7 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
-                          onPressed: _isLoading ? null : _handleLogin,
+                          onPressed: (_isLoading || !_isFormValid) ? null : _handleLogin,
                           style: ElevatedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(vertical: 16),
                           ),
@@ -438,6 +443,15 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
       return 'Password must be at least 6 characters';
     }
     return null;
+  }
+
+  void _checkFormValidity() {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+    
+    setState(() {
+      _isFormValid = email.isNotEmpty && password.isNotEmpty;
+    });
   }
 
   Future<void> _handleLogin() async {

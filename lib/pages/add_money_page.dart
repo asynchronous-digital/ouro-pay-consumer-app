@@ -7,7 +7,12 @@ import 'package:ouro_pay_consumer_app/services/deposit_service.dart';
 import 'package:flutter_stripe/flutter_stripe.dart' hide Card;
 
 class AddMoneyPage extends StatefulWidget {
-  const AddMoneyPage({super.key});
+  final String? preSelectedCurrency;
+
+  const AddMoneyPage({
+    super.key,
+    this.preSelectedCurrency,
+  });
 
   @override
   State<AddMoneyPage> createState() => _AddMoneyPageState();
@@ -21,6 +26,18 @@ class _AddMoneyPageState extends State<AddMoneyPage> {
   String _selectedCurrency = 'EUR';
   String _selectedPaymentMethod = 'bank_transfer';
   bool _isLoading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // Use pre-selected currency if provided and valid
+    if (widget.preSelectedCurrency != null) {
+      final validCurrencies = ['EUR', 'USD', 'SRD'];
+      if (validCurrencies.contains(widget.preSelectedCurrency)) {
+        _selectedCurrency = widget.preSelectedCurrency!;
+      }
+    }
+  }
 
   @override
   void dispose() {

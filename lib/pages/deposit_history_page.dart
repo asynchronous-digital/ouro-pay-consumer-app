@@ -204,7 +204,9 @@ class _DepositHistoryPageState extends State<DepositHistoryPage> {
     final result = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
-        builder: (context) => const AddMoneyPage(),
+        builder: (context) => AddMoneyPage(
+          preSelectedCurrency: widget.currency,
+        ),
       ),
     );
     // Refresh if money was added
