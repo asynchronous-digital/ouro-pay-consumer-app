@@ -914,7 +914,7 @@ class AuthService {
   /// Requires authentication token in header
   Future<UserProfileResponse> getUserProfile() async {
     try {
-      final url = Uri.parse('$_baseUrl/user/profile');
+      final url = Uri.parse('$_baseUrl/consumer/profile');
       final token = await getToken();
 
       print('');
