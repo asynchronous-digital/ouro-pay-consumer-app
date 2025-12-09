@@ -15,7 +15,9 @@ import 'package:ouro_pay_consumer_app/pages/deposit_history_page.dart';
 import 'package:ouro_pay_consumer_app/utils/debug_prefs.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:flutter/services.dart';
-import 'package:ouro_pay_consumer_app/models/user_profile.dart';
+import 'package:ouro_pay_consumer_app/services/kyc_service.dart';
+import 'package:ouro_pay_consumer_app/pages/kyc_status_page.dart';
+import 'package:ouro_pay_consumer_app/models/user_profile.dart'; // Ensure this is imported
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -48,6 +50,38 @@ class _DashboardPageState extends State<DashboardPage>
     _loadUserProfile(); // Load user profile first to get KYC status
     _loadUserData();
     _loadGoldPrice(); // Load gold price for EUR by default
+    _checkKycStatus(); // Check detailed KYC status
+  }
+
+  Future<void> _checkKycStatus() async {
+    // Wait for a brief moment to allow UI to build
+    await Future.delayed(const Duration(milliseconds: 500));
+
+    if (!mounted) return;
+
+    try {
+      print('🔍 Dashboard: Checking detailed KYC status...');
+      final kycService = KycService();
+      final kycData = await kycService.getKycStatus();
+
+      if (kycData != null && mounted) {
+        final status = kycData.computedStatus;
+        print('📋 Dashboard: KYC Status is ${status.name}');
+
+        if (status == KycStatus.rejected) {
+          print('🔒 Blocking access due to KYC status');
+
+          // Navigate to Status Page and remove Dashboard from stack (effectively blocking)
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (context) => KycStatusPage(kycData: kycData),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      print('❌ Dashboard: Error checking KYC status: $e');
+    }
   }
 
   @override
