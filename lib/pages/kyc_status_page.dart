@@ -299,17 +299,60 @@ class _KycStatusPageState extends State<KycStatusPage> {
               ),
               const SizedBox(height: 24),
               if (askFront) ...[
-                _buildUploadButton('Document Front', _documentFront, 'front'),
-                const SizedBox(height: 16),
+                if (_documentFront == null)
+                  _buildSingleUploadBox(
+                    label: 'Document Front',
+                    type: 'front',
+                    header: 'Upload Front Side',
+                    subText: 'Select JPG, PNG or take a photo',
+                  )
+                else
+                  _buildCompactPreview(
+                    label: 'Document Front',
+                    path: _documentFront!.path,
+                    file: _documentFront!,
+                    onRemove: () => setState(() => _documentFront = null),
+                  ),
+                const SizedBox(height: 24),
               ],
               if (askBack) ...[
-                _buildUploadButton('Document Back', _documentBack, 'back'),
-                const SizedBox(height: 16),
+                if (_documentBack == null)
+                  _buildSingleUploadBox(
+                    label: 'Document Back',
+                    type: 'back',
+                    header: 'Upload Back Side',
+                    subText: 'Select JPG, PNG or take a photo',
+                  )
+                else
+                  _buildCompactPreview(
+                    label: 'Document Back',
+                    path: _documentBack!.path,
+                    file: _documentBack!,
+                    onRemove: () => setState(() => _documentBack = null),
+                  ),
+                const SizedBox(height: 24),
               ],
-              if (askSelfie) _buildUploadButton('Selfie', _selfie, 'selfie'),
+              if (askSelfie) ...[
+                if (_selfie == null)
+                  _buildSingleUploadBox(
+                    label: 'Selfie',
+                    type: 'selfie',
+                    header: 'Take a Selfie',
+                    subText: 'Look directly at the camera',
+                    icon: Icons.camera_front,
+                  )
+                else
+                  _buildCompactPreview(
+                    label: 'Selfie',
+                    path: _selfie!.path,
+                    file: _selfie!,
+                    onRemove: () => setState(() => _selfie = null),
+                  ),
+                const SizedBox(height: 24),
+              ],
               const SizedBox(height: 24),
               AppButton(
-                text: 'Submit',
+                text: 'Submit Documents',
                 isLoading: _isLoading,
                 onPressed: _handleResubmit,
               ),
@@ -320,28 +363,142 @@ class _KycStatusPageState extends State<KycStatusPage> {
     );
   }
 
-  Widget _buildUploadButton(String label, File? file, String type) {
-    return GestureDetector(
-      onTap: () => _pickImage(type),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          border: Border.all(color: Colors.grey.withOpacity(0.5)),
-          borderRadius: BorderRadius.circular(8),
+  Widget _buildSingleUploadBox({
+    required String label,
+    required String type,
+    required String header,
+    required String subText,
+    IconData icon = Icons.upload_file,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: AppColors.cardBackground,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppColors.greyText.withOpacity(0.3),
+          width: 2,
+          style: BorderStyle.solid,
         ),
-        child: Row(
-          children: [
-            Icon(file != null ? Icons.check_circle : Icons.upload_file,
-                color: file != null ? Colors.green : Colors.white),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Text(
-                file != null ? 'File Selected' : 'Upload $label',
-                style: const TextStyle(color: Colors.white),
+      ),
+      child: Column(
+        children: [
+          Icon(
+            icon,
+            size: 48,
+            color: AppColors.primaryGold,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            header,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: AppColors.whiteText,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            subText,
+            style: const TextStyle(
+              fontSize: 14,
+              color: AppColors.greyText,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'Maximum file size: 2MB',
+            style: TextStyle(
+              fontSize: 12,
+              color: AppColors.primaryGold,
+              fontWeight: FontWeight.w600,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton.icon(
+            onPressed: () => _pickImage(type),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primaryGold,
+              foregroundColor: AppColors.darkBackground,
+              padding: const EdgeInsets.symmetric(
+                horizontal: 24,
+                vertical: 12,
               ),
             ),
-          ],
+            icon: Icon(icon),
+            label: Text(label.startsWith('Upload') || label.startsWith('Take')
+                ? label
+                : 'Upload $label'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCompactPreview({
+    required String label,
+    required String path,
+    required File file,
+    required VoidCallback onRemove,
+  }) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.cardBackground,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: AppColors.successGreen,
         ),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.check_circle, color: AppColors.successGreen),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    color: AppColors.whiteText,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Text(
+                  path.split('/').last,
+                  style:
+                      const TextStyle(color: AppColors.greyText, fontSize: 12),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          // Preview thumbnail
+          Container(
+            width: 40,
+            height: 40,
+            margin: const EdgeInsets.only(right: 12),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(4),
+              image: DecorationImage(
+                image: FileImage(file),
+                fit: BoxFit.cover,
+              ),
+            ),
+          ),
+          // Remove button
+          IconButton(
+            icon: const Icon(Icons.delete_outline, color: AppColors.errorRed),
+            onPressed: onRemove,
+            tooltip: 'Remove',
+          ),
+        ],
       ),
     );
   }

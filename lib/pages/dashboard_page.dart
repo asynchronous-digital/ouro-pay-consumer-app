@@ -40,6 +40,7 @@ class _DashboardPageState extends State<DashboardPage>
   String _selectedCurrency = 'USD'; // Currently selected currency for price
   UserProfile? _userProfile; // User profile with KYC status and permissions
   bool _isLoadingProfile = false; // Loading state for user profile
+  KycData? _kycData; // Direct KYC status data
 
   @override
   void initState() {
@@ -67,6 +68,9 @@ class _DashboardPageState extends State<DashboardPage>
       final kycData = await kycService.getKycStatus();
 
       if (kycData != null && mounted) {
+        setState(() {
+          _kycData = kycData;
+        });
         final status = kycData.computedStatus;
         print('📋 Dashboard: KYC Status is ${status.name}');
 
@@ -1683,7 +1687,9 @@ class _DashboardPageState extends State<DashboardPage>
 
   /// Check if KYC is approved
   bool get _isKycApproved {
-    return _userProfile?.authorization.kycStatus.isApproved ?? false;
+    if (_userProfile?.authorization.kycStatus.isApproved ?? false) return true;
+    if (_kycData?.computedStatus == KycStatus.approved) return true;
+    return false;
   }
 
   /// Show KYC verification toast message
