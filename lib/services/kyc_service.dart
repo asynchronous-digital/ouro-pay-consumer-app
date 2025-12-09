@@ -1,4 +1,8 @@
+import 'dart:convert';
 import 'dart:io';
+import 'package:http/http.dart' as http;
+import 'package:ouro_pay_consumer_app/config/app_config.dart';
+import 'package:ouro_pay_consumer_app/services/auth_service.dart';
 
 /// Enum for KYC verification status
 enum KycStatus {
@@ -359,5 +363,273 @@ class MockKycProvider implements KycServiceProvider {
   @override
   Future<bool> isServiceAvailable() async {
     return _isInitialized;
+  }
+}
+
+/// Model for the KYC status API response data
+/// Alias to KycDetails for backward compatibility if needed, using KycData as primary name
+class KycData {
+  final int? id;
+  final String? documentType;
+  final String? documentNumber;
+  final String? rejectionReason;
+  final String? adminNotes;
+  final String? submittedAt;
+  final String? reviewedAt;
+  final String? status; // In case the API returns a status field
+
+  final bool? _canResubmit;
+
+  KycData({
+    this.id,
+    this.documentType,
+    this.documentNumber,
+    this.rejectionReason,
+    this.adminNotes,
+    this.submittedAt,
+    this.reviewedAt,
+    this.status,
+    bool? canResubmit,
+  }) : _canResubmit = canResubmit;
+
+  factory KycData.fromJson(Map<String, dynamic> json) {
+    // Check for nested rejection object
+    String? rejectionReason = json['rejection_reason'];
+    bool? canResubmit = json['can_resubmit'];
+
+    if (json['rejection'] != null && json['rejection'] is Map) {
+      final rejection = json['rejection'];
+      rejectionReason ??= rejection['reason'];
+      if (rejection['can_resubmit'] != null) {
+        canResubmit = rejection['can_resubmit'];
+      }
+    }
+
+    // Also check nested kyc_status if present (wrapper)
+    if (json['kyc_status'] != null && json['kyc_status'] is Map) {
+      final kycStatus = json['kyc_status'];
+      return KycData.fromJson(kycStatus);
+    }
+
+    return KycData(
+      id: json['id'],
+      documentType: json['document_type'],
+      documentNumber: json['document_number'],
+      rejectionReason: rejectionReason,
+      adminNotes: json['admin_notes'],
+      submittedAt: json['submitted_at'],
+      reviewedAt: json['reviewed_at'],
+      status: json['status'],
+      canResubmit: canResubmit,
+    );
+  }
+
+  KycStatus get computedStatus {
+    // If we have an explicit status field, map it
+    if (status != null) {
+      switch (status!.toLowerCase()) {
+        case 'approved':
+          return KycStatus.approved;
+        case 'rejected':
+          return KycStatus.rejected;
+        case 'pending':
+        case 'submitted':
+        case 'under_review':
+          return KycStatus.pending;
+        default:
+          return KycStatus.notStarted;
+      }
+    }
+
+    // Otherwise infer from timestamps and reason
+    if (reviewedAt != null) {
+      if (rejectionReason != null) {
+        return KycStatus.rejected;
+      }
+      return KycStatus.approved;
+    }
+
+    if (submittedAt != null) {
+      return KycStatus.pending;
+    }
+
+    return KycStatus.notStarted;
+  }
+
+  bool get canResubmit {
+    if (_canResubmit != null) return _canResubmit;
+    return computedStatus == KycStatus.rejected;
+  }
+}
+
+class KycRequirements {
+  final List<String> requiredDocs;
+  final String? reason;
+  final String? moderationComment;
+  final bool canResubmit;
+  final int resubmissionCount;
+  final int maxResubmissions;
+
+  KycRequirements({
+    required this.requiredDocs,
+    this.reason,
+    this.moderationComment,
+    required this.canResubmit,
+    required this.resubmissionCount,
+    required this.maxResubmissions,
+  });
+
+  factory KycRequirements.fromJson(Map<String, dynamic> json) {
+    final requirements = json['requirements'] ?? {};
+    final resubInfo = json['resubmission_info'] ?? {};
+
+    List<String> requiredList = [];
+    if (requirements['required'] != null) {
+      requiredList = List<String>.from(requirements['required']);
+    }
+
+    return KycRequirements(
+      requiredDocs: requiredList,
+      reason: requirements['reason'],
+      moderationComment: resubInfo['moderation_comment'],
+      canResubmit: json['can_resubmit'] ?? false,
+      resubmissionCount: resubInfo['resubmission_count'] ?? 0,
+      maxResubmissions: resubInfo['max_resubmissions'] ?? 3,
+    );
+  }
+}
+
+/// Service to handle KYC API interactions
+class KycService {
+  final AuthService _authService = AuthService();
+
+  String get _baseUrl => AppConfig.baseUrl;
+
+  /// Get current KYC status from backend
+  Future<KycData?> getKycStatus() async {
+    try {
+      final token = await _authService.getToken();
+      if (token == null) return null;
+
+      final url = Uri.parse('$_baseUrl/kyc/status');
+
+      print('🔍 Checking KYC Status: $url');
+
+      final response = await http.get(
+        url,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        },
+      ).timeout(const Duration(seconds: 10));
+
+      print(
+          '📥 KYC Status Response: ${response.statusCode} - ${response.body}');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['success'] == true && data['data'] != null) {
+          return KycData.fromJson(data['data']);
+        } else if (data['success'] == false && data['message'] != null) {
+          // Handle known error responses if needed
+          print('⚠️ KYC Status API returned false success: ${data['message']}');
+        }
+      }
+      return null;
+    } catch (e) {
+      print('❌ Error checking KYC status: $e');
+      return null;
+    }
+  }
+
+  /// Get detailed requirements for KYC resubmission
+  Future<KycRequirements?> getKycRequirements() async {
+    try {
+      final token = await _authService.getToken();
+      if (token == null) return null;
+
+      final url = Uri.parse('$_baseUrl/kyc/requirements');
+      print('🔍 Checking KYC Requirements: $url');
+
+      final response = await http.get(
+        url,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        },
+      ).timeout(const Duration(seconds: 10));
+
+      print(
+          '📥 KYC Requirements Response: ${response.statusCode} - ${response.body}');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['success'] == true && data['data'] != null) {
+          return KycRequirements.fromJson(data['data']);
+        }
+      }
+      return null;
+    } catch (e) {
+      print('❌ Error checking KYC requirements: $e');
+      return null;
+    }
+  }
+
+  /// Resubmit KYC documents
+  Future<bool> resubmitKyc({
+    required File? documentFront,
+    required File? documentBack,
+    required File? selfie,
+  }) async {
+    try {
+      final token = await _authService.getToken();
+      if (token == null) return false;
+
+      final url = Uri.parse('$_baseUrl/kyc/resubmit');
+      final request = http.MultipartRequest('POST', url);
+
+      request.headers.addAll({
+        'Authorization': 'Bearer $token',
+        'Accept': 'application/json',
+      });
+
+      if (documentFront != null) {
+        request.files.add(await http.MultipartFile.fromPath(
+          'document_front',
+          documentFront.path,
+        ));
+      }
+
+      if (documentBack != null) {
+        request.files.add(await http.MultipartFile.fromPath(
+          'document_back',
+          documentBack.path,
+        ));
+      }
+
+      if (selfie != null) {
+        request.files.add(await http.MultipartFile.fromPath(
+          'selfie_image',
+          selfie.path,
+        ));
+      }
+
+      print('📤 Resubmitting KYC documents...');
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+
+      print(
+          '📥 KYC Resubmit Response: ${response.statusCode} - ${response.body}');
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final data = jsonDecode(response.body);
+        return data['success'] == true;
+      }
+
+      return false;
+    } catch (e) {
+      print('❌ Error resubmitting KYC: $e');
+      return false;
+    }
   }
 }

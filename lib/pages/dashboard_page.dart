@@ -15,7 +15,9 @@ import 'package:ouro_pay_consumer_app/pages/deposit_history_page.dart';
 import 'package:ouro_pay_consumer_app/utils/debug_prefs.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:flutter/services.dart';
-import 'package:ouro_pay_consumer_app/models/user_profile.dart';
+import 'package:ouro_pay_consumer_app/services/kyc_service.dart';
+import 'package:ouro_pay_consumer_app/pages/kyc_status_page.dart';
+import 'package:ouro_pay_consumer_app/models/user_profile.dart'; // Ensure this is imported
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -38,6 +40,7 @@ class _DashboardPageState extends State<DashboardPage>
   String _selectedCurrency = 'USD'; // Currently selected currency for price
   UserProfile? _userProfile; // User profile with KYC status and permissions
   bool _isLoadingProfile = false; // Loading state for user profile
+  KycData? _kycData; // Direct KYC status data
 
   @override
   void initState() {
@@ -48,6 +51,43 @@ class _DashboardPageState extends State<DashboardPage>
     _loadUserProfile(); // Load user profile first to get KYC status
     _loadUserData();
     _loadGoldPrice(); // Load gold price for EUR by default
+    _checkKycStatus(); // Check detailed KYC status
+  }
+
+  Future<void> _checkKycStatus({bool withDelay = true}) async {
+    // Wait for a brief moment to allow UI to build
+    if (withDelay) {
+      await Future.delayed(const Duration(milliseconds: 500));
+    }
+
+    if (!mounted) return;
+
+    try {
+      print('🔍 Dashboard: Checking detailed KYC status...');
+      final kycService = KycService();
+      final kycData = await kycService.getKycStatus();
+
+      if (kycData != null && mounted) {
+        setState(() {
+          _kycData = kycData;
+        });
+        final status = kycData.computedStatus;
+        print('📋 Dashboard: KYC Status is ${status.name}');
+
+        if (status == KycStatus.rejected) {
+          print('🔒 Blocking access due to KYC status');
+
+          // Navigate to Status Page and remove Dashboard from stack (effectively blocking)
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (context) => KycStatusPage(kycData: kycData),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      print('❌ Dashboard: Error checking KYC status: $e');
+    }
   }
 
   @override
@@ -335,6 +375,11 @@ class _DashboardPageState extends State<DashboardPage>
   }
 
   Future<void> _refreshData() async {
+    // check kyc status first
+    await _checkKycStatus(withDelay: false);
+
+    if (!mounted) return;
+
     // Refresh all data
     await Future.wait([
       _loadUserProfile(),
@@ -1642,7 +1687,9 @@ class _DashboardPageState extends State<DashboardPage>
 
   /// Check if KYC is approved
   bool get _isKycApproved {
-    return _userProfile?.authorization.kycStatus.isApproved ?? false;
+    if (_userProfile?.authorization.kycStatus.isApproved ?? false) return true;
+    if (_kycData?.computedStatus == KycStatus.approved) return true;
+    return false;
   }
 
   /// Show KYC verification toast message
