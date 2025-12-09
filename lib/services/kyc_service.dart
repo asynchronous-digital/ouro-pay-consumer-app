@@ -378,6 +378,8 @@ class KycData {
   final String? reviewedAt;
   final String? status; // In case the API returns a status field
 
+  final bool? _canResubmit;
+
   KycData({
     this.id,
     this.documentType,
@@ -387,18 +389,38 @@ class KycData {
     this.submittedAt,
     this.reviewedAt,
     this.status,
-  });
+    bool? canResubmit,
+  }) : _canResubmit = canResubmit;
 
   factory KycData.fromJson(Map<String, dynamic> json) {
+    // Check for nested rejection object
+    String? rejectionReason = json['rejection_reason'];
+    bool? canResubmit = json['can_resubmit'];
+
+    if (json['rejection'] != null && json['rejection'] is Map) {
+      final rejection = json['rejection'];
+      rejectionReason ??= rejection['reason'];
+      if (rejection['can_resubmit'] != null) {
+        canResubmit = rejection['can_resubmit'];
+      }
+    }
+
+    // Also check nested kyc_status if present (wrapper)
+    if (json['kyc_status'] != null && json['kyc_status'] is Map) {
+      final kycStatus = json['kyc_status'];
+      return KycData.fromJson(kycStatus);
+    }
+
     return KycData(
       id: json['id'],
       documentType: json['document_type'],
       documentNumber: json['document_number'],
-      rejectionReason: json['rejection_reason'],
+      rejectionReason: rejectionReason,
       adminNotes: json['admin_notes'],
       submittedAt: json['submitted_at'],
       reviewedAt: json['reviewed_at'],
       status: json['status'],
+      canResubmit: canResubmit,
     );
   }
 
@@ -434,7 +456,47 @@ class KycData {
     return KycStatus.notStarted;
   }
 
-  bool get canResubmit => computedStatus == KycStatus.rejected;
+  bool get canResubmit {
+    if (_canResubmit != null) return _canResubmit;
+    return computedStatus == KycStatus.rejected;
+  }
+}
+
+class KycRequirements {
+  final List<String> requiredDocs;
+  final String? reason;
+  final String? moderationComment;
+  final bool canResubmit;
+  final int resubmissionCount;
+  final int maxResubmissions;
+
+  KycRequirements({
+    required this.requiredDocs,
+    this.reason,
+    this.moderationComment,
+    required this.canResubmit,
+    required this.resubmissionCount,
+    required this.maxResubmissions,
+  });
+
+  factory KycRequirements.fromJson(Map<String, dynamic> json) {
+    final requirements = json['requirements'] ?? {};
+    final resubInfo = json['resubmission_info'] ?? {};
+
+    List<String> requiredList = [];
+    if (requirements['required'] != null) {
+      requiredList = List<String>.from(requirements['required']);
+    }
+
+    return KycRequirements(
+      requiredDocs: requiredList,
+      reason: requirements['reason'],
+      moderationComment: resubInfo['moderation_comment'],
+      canResubmit: json['can_resubmit'] ?? false,
+      resubmissionCount: resubInfo['resubmission_count'] ?? 0,
+      maxResubmissions: resubInfo['max_resubmissions'] ?? 3,
+    );
+  }
 }
 
 /// Service to handle KYC API interactions
@@ -480,6 +542,39 @@ class KycService {
     }
   }
 
+  /// Get detailed requirements for KYC resubmission
+  Future<KycRequirements?> getKycRequirements() async {
+    try {
+      final token = await _authService.getToken();
+      if (token == null) return null;
+
+      final url = Uri.parse('$_baseUrl/kyc/requirements');
+      print('🔍 Checking KYC Requirements: $url');
+
+      final response = await http.get(
+        url,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        },
+      ).timeout(const Duration(seconds: 10));
+
+      print(
+          '📥 KYC Requirements Response: ${response.statusCode} - ${response.body}');
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (data['success'] == true && data['data'] != null) {
+          return KycRequirements.fromJson(data['data']);
+        }
+      }
+      return null;
+    } catch (e) {
+      print('❌ Error checking KYC requirements: $e');
+      return null;
+    }
+  }
+
   /// Resubmit KYC documents
   Future<bool> resubmitKyc({
     required File? documentFront,
@@ -487,10 +582,50 @@ class KycService {
     required File? selfie,
   }) async {
     try {
-      // Implementation pending - just return false or throw for now
-      // Or implement actual resubmission logic if endpoint known
-      print('⚠️ resubmitKyc not fully implemented yet');
-      await Future.delayed(const Duration(seconds: 1));
+      final token = await _authService.getToken();
+      if (token == null) return false;
+
+      final url = Uri.parse('$_baseUrl/kyc/resubmit');
+      final request = http.MultipartRequest('POST', url);
+
+      request.headers.addAll({
+        'Authorization': 'Bearer $token',
+        'Accept': 'application/json',
+      });
+
+      if (documentFront != null) {
+        request.files.add(await http.MultipartFile.fromPath(
+          'document_front',
+          documentFront.path,
+        ));
+      }
+
+      if (documentBack != null) {
+        request.files.add(await http.MultipartFile.fromPath(
+          'document_back',
+          documentBack.path,
+        ));
+      }
+
+      if (selfie != null) {
+        request.files.add(await http.MultipartFile.fromPath(
+          'selfie_image',
+          selfie.path,
+        ));
+      }
+
+      print('📤 Resubmitting KYC documents...');
+      final streamedResponse = await request.send();
+      final response = await http.Response.fromStream(streamedResponse);
+
+      print(
+          '📥 KYC Resubmit Response: ${response.statusCode} - ${response.body}');
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final data = jsonDecode(response.body);
+        return data['success'] == true;
+      }
+
       return false;
     } catch (e) {
       print('❌ Error resubmitting KYC: $e');

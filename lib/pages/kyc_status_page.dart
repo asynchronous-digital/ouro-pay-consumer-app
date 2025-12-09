@@ -25,6 +25,28 @@ class _KycStatusPageState extends State<KycStatusPage> {
   File? _selfie;
 
   bool _isResubmitting = false;
+  KycRequirements? _requirements;
+  bool _isLoadingRequirements = false;
+
+  Future<void> _startResubmission() async {
+    setState(() {
+      _isLoadingRequirements = true;
+    });
+
+    final requirements = await KycService().getKycRequirements();
+
+    if (mounted) {
+      setState(() {
+        _requirements = requirements;
+        _isLoadingRequirements = false;
+        _isResubmitting = true;
+        // Reset files on new attempt
+        _documentFront = null;
+        _documentBack = null;
+        _selfie = null;
+      });
+    }
+  }
 
   Future<void> _pickImage(String type) async {
     final XFile? image =
@@ -117,11 +139,8 @@ class _KycStatusPageState extends State<KycStatusPage> {
               if (widget.kycData.canResubmit)
                 AppButton(
                   text: 'Resubmit KYC Information',
-                  onPressed: () {
-                    // Fetch requirements first?
-                    // For simplicity, just show upload form
-                    setState(() => _isResubmitting = true);
-                  },
+                  onPressed: _startResubmission,
+                  isLoading: _isLoadingRequirements,
                 )
               else
                 const Text(
@@ -231,6 +250,20 @@ class _KycStatusPageState extends State<KycStatusPage> {
   }
 
   Widget _buildResubmissionForm() {
+    final requiredDocs = _requirements?.requiredDocs ?? [];
+    final showAll = requiredDocs.isEmpty;
+    final showIdCard = showAll || requiredDocs.contains('ID_CARD');
+    final showPassport = showAll || requiredDocs.contains('PASSPORT');
+    final showDriverLicense =
+        showAll || requiredDocs.contains('DRIVERS_LICENSE');
+    final showSelfie = showAll || requiredDocs.contains('SELFIE');
+
+    // Determine which internal flags to activate
+    // ID_CARD, DRIVERS_LICENSE imply Front & Back usually. PASSPORT usually front.
+    final bool askFront = showIdCard || showPassport || showDriverLicense;
+    final bool askBack = showIdCard || showDriverLicense;
+    final bool askSelfie = showSelfie;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Resubmit Documents'),
@@ -241,26 +274,47 @@ class _KycStatusPageState extends State<KycStatusPage> {
       ),
       body: Padding(
         padding: const EdgeInsets.all(24.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Text(
-              'Please upload the required documents.',
-              style: TextStyle(color: Colors.grey),
-            ),
-            const SizedBox(height: 24),
-            _buildUploadButton('Document Front', _documentFront, 'front'),
-            const SizedBox(height: 16),
-            _buildUploadButton('Document Back', _documentBack, 'back'),
-            const SizedBox(height: 16),
-            _buildUploadButton('Selfie', _selfie, 'selfie'),
-            const Spacer(),
-            AppButton(
-              text: 'Submit',
-              isLoading: _isLoading,
-              onPressed: _handleResubmit,
-            ),
-          ],
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (_requirements?.moderationComment != null) ...[
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.amber.withOpacity(0.5)),
+                  ),
+                  child: Text(
+                    _requirements!.moderationComment!,
+                    style: const TextStyle(color: Colors.amber),
+                  ),
+                ),
+                const SizedBox(height: 24),
+              ],
+              const Text(
+                'Please upload the required documents.',
+                style: TextStyle(color: Colors.grey),
+              ),
+              const SizedBox(height: 24),
+              if (askFront) ...[
+                _buildUploadButton('Document Front', _documentFront, 'front'),
+                const SizedBox(height: 16),
+              ],
+              if (askBack) ...[
+                _buildUploadButton('Document Back', _documentBack, 'back'),
+                const SizedBox(height: 16),
+              ],
+              if (askSelfie) _buildUploadButton('Selfie', _selfie, 'selfie'),
+              const SizedBox(height: 24),
+              AppButton(
+                text: 'Submit',
+                isLoading: _isLoading,
+                onPressed: _handleResubmit,
+              ),
+            ],
+          ),
         ),
       ),
     );

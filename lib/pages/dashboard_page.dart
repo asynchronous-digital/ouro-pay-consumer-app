@@ -53,9 +53,11 @@ class _DashboardPageState extends State<DashboardPage>
     _checkKycStatus(); // Check detailed KYC status
   }
 
-  Future<void> _checkKycStatus() async {
+  Future<void> _checkKycStatus({bool withDelay = true}) async {
     // Wait for a brief moment to allow UI to build
-    await Future.delayed(const Duration(milliseconds: 500));
+    if (withDelay) {
+      await Future.delayed(const Duration(milliseconds: 500));
+    }
 
     if (!mounted) return;
 
@@ -369,6 +371,11 @@ class _DashboardPageState extends State<DashboardPage>
   }
 
   Future<void> _refreshData() async {
+    // check kyc status first
+    await _checkKycStatus(withDelay: false);
+
+    if (!mounted) return;
+
     // Refresh all data
     await Future.wait([
       _loadUserProfile(),
