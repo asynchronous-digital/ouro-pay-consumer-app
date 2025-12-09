@@ -614,12 +614,19 @@ class KycService {
         ));
       }
 
-      print('📤 Resubmitting KYC documents...');
+      print('🔍 Resubmitting KYC to URL: $url');
+      if (documentFront != null)
+        print('   📄 Adding document_front: ${documentFront.path}');
+      if (documentBack != null)
+        print('   📄 Adding document_back: ${documentBack.path}');
+      if (selfie != null) print('   📸 Adding selfie_image: ${selfie.path}');
+
+      print('📤 Sending request...');
       final streamedResponse = await request.send();
       final response = await http.Response.fromStream(streamedResponse);
 
-      print(
-          '📥 KYC Resubmit Response: ${response.statusCode} - ${response.body}');
+      print('📥 KYC Resubmit Response Code: ${response.statusCode}');
+      print('📥 KYC Resubmit Response Body: ${response.body}');
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         final data = jsonDecode(response.body);
