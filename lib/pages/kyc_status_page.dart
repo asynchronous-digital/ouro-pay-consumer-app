@@ -30,7 +30,15 @@ class _KycStatusPageState extends State<KycStatusPage> {
   KycRequirements? _requirements;
   bool _isLoadingRequirements = false;
 
-  Future<void> _startResubmission() async {
+  @override
+  void initState() {
+    super.initState();
+    if (widget.kycData.status == 'rejected') {
+      _fetchRequirements();
+    }
+  }
+
+  Future<void> _fetchRequirements() async {
     setState(() {
       _isLoadingRequirements = true;
     });
@@ -41,6 +49,22 @@ class _KycStatusPageState extends State<KycStatusPage> {
       setState(() {
         _requirements = requirements;
         _isLoadingRequirements = false;
+      });
+    }
+  }
+
+  Future<void> _startResubmission() async {
+    if (_requirements == null) {
+      await _fetchRequirements();
+    }
+
+    // If still blocked after fetch (should be handled by UI, but double check)
+    if (_requirements != null && !_requirements!.canResubmit) {
+      return;
+    }
+
+    if (mounted) {
+      setState(() {
         _isResubmitting = true;
         // Reset files on new attempt
         _documentFront = null;
@@ -315,6 +339,17 @@ class _KycStatusPageState extends State<KycStatusPage> {
   }
 
   Future<void> _handleResubmit() async {
+    if (_requirements != null && !_requirements!.canResubmit) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+              _requirements!.resubmissionReason ?? 'Resubmission not allowed'),
+          backgroundColor: AppColors.errorRed,
+        ),
+      );
+      return;
+    }
+
     if (_documentFront == null && _documentBack == null && _selfie == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please upload at least one document')),
@@ -338,9 +373,9 @@ class _KycStatusPageState extends State<KycStatusPage> {
           const SnackBar(content: Text('KYC resubmitted successfully')),
         );
 
-        // Refresh status - effectively reloading the page logic
-        // For now, simpler to navigate back to splash to re-check status
-        Navigator.of(context).pushReplacementNamed('/splash');
+        // Navigate to dashboard instead of splash
+        Navigator.of(context)
+            .pushNamedAndRemoveUntil('/dashboard', (route) => false);
       }
     } else {
       if (mounted) {
@@ -388,11 +423,35 @@ class _KycStatusPageState extends State<KycStatusPage> {
             if (widget.kycData.status == 'rejected') ...[
               _buildRejectionDetails(),
               const SizedBox(height: 24),
-              if (widget.kycData.canResubmit)
+              if (_isLoadingRequirements)
+                const AppButton(
+                  text: 'Loading...',
+                  isLoading: true,
+                )
+              else if (_requirements != null) ...[
+                AppButton(
+                  text: 'Resubmit KYC Information',
+                  onPressed: _requirements!.canResubmit
+                      ? _startResubmission
+                      : null, // Disabled if false
+                ),
+                if (!_requirements!.canResubmit &&
+                    _requirements!.resubmissionReason != null) ...[
+                  const SizedBox(height: 12),
+                  Text(
+                    _requirements!.resubmissionReason!,
+                    style: const TextStyle(
+                      color: AppColors.errorRed,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              ] else if (widget.kycData.canResubmit)
                 AppButton(
                   text: 'Resubmit KYC Information',
                   onPressed: _startResubmission,
-                  isLoading: _isLoadingRequirements,
                 )
               else
                 const Text(

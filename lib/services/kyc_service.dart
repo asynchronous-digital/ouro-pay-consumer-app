@@ -467,6 +467,7 @@ class KycRequirements {
   final String? reason;
   final String? moderationComment;
   final bool canResubmit;
+  final String? resubmissionReason;
   final int resubmissionCount;
   final int maxResubmissions;
 
@@ -475,6 +476,7 @@ class KycRequirements {
     this.reason,
     this.moderationComment,
     required this.canResubmit,
+    this.resubmissionReason,
     required this.resubmissionCount,
     required this.maxResubmissions,
   });
@@ -493,6 +495,7 @@ class KycRequirements {
       reason: requirements['reason'],
       moderationComment: resubInfo['moderation_comment'],
       canResubmit: json['can_resubmit'] ?? false,
+      resubmissionReason: resubInfo['reason'],
       resubmissionCount: resubInfo['resubmission_count'] ?? 0,
       maxResubmissions: resubInfo['max_resubmissions'] ?? 3,
     );
