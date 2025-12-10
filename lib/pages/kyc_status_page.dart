@@ -29,6 +29,7 @@ class _KycStatusPageState extends State<KycStatusPage> {
   bool _isResubmitting = false;
   KycRequirements? _requirements;
   bool _isLoadingRequirements = false;
+  bool _isLoggingOut = false;
 
   @override
   void initState() {
@@ -387,8 +388,10 @@ class _KycStatusPageState extends State<KycStatusPage> {
   }
 
   Future<void> _logout() async {
+    setState(() => _isLoggingOut = true);
     await AuthService().logout();
     if (mounted) {
+      setState(() => _isLoggingOut = false);
       Navigator.of(context).pushNamedAndRemoveUntil('/login', (route) => false);
     }
   }
@@ -404,10 +407,24 @@ class _KycStatusPageState extends State<KycStatusPage> {
       appBar: AppBar(
         title: const Text('KYC Status'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: _logout,
-          ),
+          if (_isLoggingOut)
+            const Padding(
+              padding: EdgeInsets.all(12.0),
+              child: SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor:
+                      AlwaysStoppedAnimation<Color>(AppColors.primaryGold),
+                ),
+              ),
+            )
+          else
+            IconButton(
+              icon: const Icon(Icons.logout),
+              onPressed: _logout,
+            ),
         ],
       ),
       body: Padding(
