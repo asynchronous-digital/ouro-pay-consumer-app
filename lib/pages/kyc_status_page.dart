@@ -1,6 +1,8 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'package:ouro_pay_consumer_app/services/kyc_service.dart';
 import 'package:ouro_pay_consumer_app/services/auth_service.dart';
 import 'package:ouro_pay_consumer_app/theme/app_theme.dart';
@@ -48,18 +50,268 @@ class _KycStatusPageState extends State<KycStatusPage> {
     }
   }
 
-  Future<void> _pickImage(String type) async {
-    final XFile? image =
-        await _imagePicker.pickImage(source: ImageSource.gallery);
-    if (image != null) {
-      setState(() {
-        if (type == 'front')
-          _documentFront = File(image.path);
-        else if (type == 'back')
-          _documentBack = File(image.path);
-        else if (type == 'selfie') _selfie = File(image.path);
-      });
+  Future<void> _startSelection(String type) async {
+    // Show options for document upload
+    // For selfie, we might want to suggest camera primarily, but let's give options if user wants.
+    // Signup usually forces camera for selfie for liveness, but here we will provide options as requested.
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.cardBackground,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Upload ${type == 'front' ? "Front Side" : type == 'back' ? "Back Side" : "Selfie"}',
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.whiteText,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Select upload method',
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: AppColors.greyText,
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // Take Photo option
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryGold.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.camera_alt,
+                    color: AppColors.primaryGold,
+                  ),
+                ),
+                title: const Text(
+                  'Take Photo',
+                  style: TextStyle(
+                    color: AppColors.whiteText,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                subtitle: const Text(
+                  'Use your camera to capture',
+                  style: TextStyle(color: AppColors.greyText, fontSize: 12),
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+                  _pickImageFromCamera(type);
+                },
+              ),
+              const SizedBox(height: 8),
+
+              // Choose from Gallery option
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.primaryGold.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.photo_library,
+                    color: AppColors.primaryGold,
+                  ),
+                ),
+                title: const Text(
+                  'Choose from Gallery',
+                  style: TextStyle(
+                    color: AppColors.whiteText,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                subtitle: const Text(
+                  'Select JPG or PNG image',
+                  style: TextStyle(color: AppColors.greyText, fontSize: 12),
+                ),
+                onTap: () {
+                  Navigator.pop(context);
+                  _pickImageFromGallery(type);
+                },
+              ),
+
+              // Select PDF option (Only for documents, not selfie)
+              if (type != 'selfie') ...[
+                const SizedBox(height: 8),
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppColors.primaryGold.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(
+                      Icons.picture_as_pdf,
+                      color: AppColors.primaryGold,
+                    ),
+                  ),
+                  title: const Text(
+                    'Select PDF File',
+                    style: TextStyle(
+                      color: AppColors.whiteText,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  subtitle: const Text(
+                    'Choose PDF document',
+                    style: TextStyle(color: AppColors.greyText, fontSize: 12),
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    _pickPdfFile(type);
+                  },
+                ),
+              ],
+              const SizedBox(height: 16),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickImageFromCamera(String type) async {
+    try {
+      final XFile? image = await _imagePicker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 85,
+        maxWidth: 1920,
+        maxHeight: 1920,
+      );
+
+      if (image != null) {
+        final compressedFile = await _compressImage(File(image.path));
+        if (compressedFile == null) {
+          _showBottomSnackBar('Failed to process image', AppColors.errorRed);
+          return;
+        }
+
+        final fileSize = await compressedFile.length();
+        if (fileSize > 2 * 1024 * 1024) {
+          _showBottomSnackBar(
+              'File size must be less than 2MB', AppColors.errorRed);
+          return;
+        }
+
+        _setFile(type, compressedFile);
+      }
+    } catch (e) {
+      _showBottomSnackBar('Error capturing image: $e', AppColors.errorRed);
     }
+  }
+
+  Future<void> _pickImageFromGallery(String type) async {
+    try {
+      final XFile? image = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 85,
+        maxWidth: 1920,
+        maxHeight: 1920,
+      );
+
+      if (image != null) {
+        final compressedFile = await _compressImage(File(image.path));
+        if (compressedFile == null) {
+          _showBottomSnackBar('Failed to process image', AppColors.errorRed);
+          return;
+        }
+
+        final fileSize = await compressedFile.length();
+        if (fileSize > 2 * 1024 * 1024) {
+          _showBottomSnackBar(
+              'File size must be less than 2MB', AppColors.errorRed);
+          return;
+        }
+
+        _setFile(type, compressedFile);
+      }
+    } catch (e) {
+      _showBottomSnackBar('Error selecting image: $e', AppColors.errorRed);
+    }
+  }
+
+  Future<void> _pickPdfFile(String type) async {
+    try {
+      FilePickerResult? result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['pdf'],
+      );
+
+      if (result != null && result.files.single.path != null) {
+        final file = File(result.files.single.path!);
+        final fileSize = await file.length();
+
+        if (fileSize > 2 * 1024 * 1024) {
+          _showBottomSnackBar(
+              'File size must be less than 2MB', AppColors.errorRed);
+          return;
+        }
+
+        _setFile(type, file);
+      }
+    } catch (e) {
+      _showBottomSnackBar('Error selecting PDF: $e', AppColors.errorRed);
+    }
+  }
+
+  void _setFile(String type, File file) {
+    setState(() {
+      if (type == 'front')
+        _documentFront = file;
+      else if (type == 'back')
+        _documentBack = file;
+      else if (type == 'selfie') _selfie = file;
+    });
+  }
+
+  Future<File?> _compressImage(File file) async {
+    try {
+      final filePath = file.absolute.path;
+      final lastIndex = filePath.lastIndexOf(RegExp(r'.jp'));
+      if (lastIndex == -1)
+        return file; // If not jpg/jpeg, return original (or handle png)
+
+      final splitted = filePath.substring(0, lastIndex);
+      final outPath = '${splitted}_compressed.jpg';
+
+      var result = await FlutterImageCompress.compressAndGetFile(
+        file.absolute.path,
+        outPath,
+        quality: 85,
+      );
+
+      return result != null ? File(result.path) : file;
+    } catch (e) {
+      return file;
+    }
+  }
+
+  void _showBottomSnackBar(String message, Color backgroundColor) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: backgroundColor,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   Future<void> _handleResubmit() async {
@@ -420,7 +672,7 @@ class _KycStatusPageState extends State<KycStatusPage> {
           ),
           const SizedBox(height: 16),
           ElevatedButton.icon(
-            onPressed: () => _pickImage(type),
+            onPressed: () => _startSelection(type),
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primaryGold,
               foregroundColor: AppColors.darkBackground,
