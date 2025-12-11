@@ -30,13 +30,13 @@ android {
     productFlavors {
         development {
             dimension "default"
-            resValue "string", "app_name", "Ouro Pay Dev"
+            resValue "string", "app_name", "OUROPAY Consumer Dev"
             applicationId = "com.ouropay.consumer.development"
             versionNameSuffix = "-dev"
         }
         production {
             dimension "default"
-            resValue "string", "app_name", "Ouro Pay"
+            resValue "string", "app_name", "OUROPAY Consumer"
             applicationId = "com.ouropay.consumer"
         }
     }

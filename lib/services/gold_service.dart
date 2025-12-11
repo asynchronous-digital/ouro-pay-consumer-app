@@ -346,6 +346,9 @@ class GoldService {
       return GoldActionResponse(
         success: data['success'] ?? false,
         message: data['message'] ?? 'Buy gold request completed',
+        errors: data['errors'] != null
+            ? data['errors'] as Map<String, dynamic>
+            : null,
       );
     } catch (e) {
       return GoldActionResponse(success: false, message: e.toString());
@@ -389,6 +392,9 @@ class GoldService {
       return GoldActionResponse(
         success: data['success'] ?? false,
         message: data['message'] ?? 'Sell gold request completed',
+        errors: data['errors'] != null
+            ? data['errors'] as Map<String, dynamic>
+            : null,
       );
     } catch (e) {
       return GoldActionResponse(success: false, message: e.toString());
@@ -530,7 +536,8 @@ class GoldPriceResponse {
 class GoldActionResponse {
   final bool success;
   final String? message;
-  GoldActionResponse({required this.success, this.message});
+  final Map<String, dynamic>? errors;
+  GoldActionResponse({required this.success, this.message, this.errors});
 }
 
 class GoldTransactionsResponse {

@@ -23,9 +23,9 @@ class AppConfig {
 
     switch (_environment) {
       case Environment.development:
-        return 'Ouro Pay Dev';
+        return 'OUROPAY Consumer Dev';
       case Environment.production:
-        return 'Ouro Pay';
+        return 'OUROPAY Consumer';
     }
   }
 

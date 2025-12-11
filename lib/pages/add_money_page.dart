@@ -127,7 +127,7 @@ class _AddMoneyPageState extends State<AddMoneyPage> {
               await Stripe.instance.initPaymentSheet(
                 paymentSheetParameters: SetupPaymentSheetParameters(
                   paymentIntentClientSecret: response.clientSecret!,
-                  merchantDisplayName: 'Ouro Pay',
+                  merchantDisplayName: AppConfig.appName,
                   style: ThemeMode.dark,
                   appearance: const PaymentSheetAppearance(
                     colors: PaymentSheetAppearanceColors(

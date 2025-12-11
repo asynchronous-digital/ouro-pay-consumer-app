@@ -57,8 +57,18 @@ class _TradeConfirmationPageState extends State<TradeConfirmationPage> {
     final grams = double.tryParse(_gramsController.text) ?? 0.0;
     setState(() {
       _totalValue = grams * _currentPricePerGram;
-      // Clear error message when value is valid/updated
-      _errorMessage = null;
+
+      // Check for insufficient funds immediately
+      if (widget.isBuy && _totalValue > _availableBalance) {
+        _errorMessage =
+            'Insufficient funds. Available: ${_availableBalance.toStringAsFixed(2)} $_selectedCurrency';
+      } else if (!widget.isBuy && grams > _availableGoldHoldings) {
+        _errorMessage =
+            'Insufficient gold. Available: ${_availableGoldHoldings.toStringAsFixed(3)}g';
+      } else {
+        // Clear error message when value is valid
+        _errorMessage = null;
+      }
     });
   }
 
@@ -292,7 +302,25 @@ class _TradeConfirmationPageState extends State<TradeConfirmationPage> {
         // Stop loading for error case
         setState(() => _isLoading = false);
 
-        // Show error message
+        // Check for field-specific errors
+        if (resp.errors != null && resp.errors!.containsKey('grams')) {
+          final gramsErrors = resp.errors!['grams'];
+          String? errorMsg;
+          if (gramsErrors is List && gramsErrors.isNotEmpty) {
+            errorMsg = gramsErrors.first.toString();
+          } else if (gramsErrors is String) {
+            errorMsg = gramsErrors;
+          }
+
+          if (errorMsg != null) {
+            setState(() {
+              _errorMessage = errorMsg;
+            });
+            // Continue to show SnackBar as well
+          }
+        }
+
+        // Show error message via SnackBar if not handled inline
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(resp.message ?? 'Transaction failed'),
@@ -425,7 +453,7 @@ class _TradeConfirmationPageState extends State<TradeConfirmationPage> {
                     keyboardType:
                         const TextInputType.numberWithOptions(decimal: true),
                     inputFormatters: [
-                      LengthLimitingTextInputFormatter(4),
+                      LengthLimitingTextInputFormatter(10),
                       FilteringTextInputFormatter.allow(
                           RegExp(r'^\d*\.?\d{0,3}')),
                       if (widget.isBuy)
@@ -709,10 +737,11 @@ class MaxAffordableGramsFormatter extends TextInputFormatter {
     // Calculate the total cost for the entered grams
     final totalCost = grams * pricePerGram;
 
-    // If total cost exceeds available balance, reject the input
+    // If total cost exceeds available balance, notify user but allow input
     if (totalCost > availableBalance) {
       onExceeded?.call();
-      return oldValue;
+      // We purposefully do NOT return oldValue here, allowing the user to type
+      // but showing the error message via the callback.
     }
 
     return newValue;
