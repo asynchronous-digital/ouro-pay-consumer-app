@@ -31,7 +31,8 @@ class _TradeConfirmationPageState extends State<TradeConfirmationPage> {
   bool _isPriceLoading = false;
   bool _isBalanceLoading = false;
   double _availableGoldHoldings = 0.0;
-  DateTime? _lastInsufficientFundsSnackbar;
+  String? _errorMessage;
+  // Removed _lastInsufficientFundsSnackbar as we are using errorText now
 
   @override
   void initState() {
@@ -56,47 +57,23 @@ class _TradeConfirmationPageState extends State<TradeConfirmationPage> {
     final grams = double.tryParse(_gramsController.text) ?? 0.0;
     setState(() {
       _totalValue = grams * _currentPricePerGram;
+      // Clear error message when value is valid/updated
+      _errorMessage = null;
     });
   }
 
   void _showInsufficientFundsMessage() {
-    // Throttle snackbar to once every 2 seconds
-    final now = DateTime.now();
-    if (_lastInsufficientFundsSnackbar != null &&
-        now.difference(_lastInsufficientFundsSnackbar!).inSeconds < 2) {
-      return;
-    }
-    _lastInsufficientFundsSnackbar = now;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Insufficient funds. Available: ${_availableBalance.toStringAsFixed(2)} $_selectedCurrency',
-        ),
-        backgroundColor: AppColors.errorRed,
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    setState(() {
+      _errorMessage =
+          'Insufficient funds. Available: ${_availableBalance.toStringAsFixed(2)} $_selectedCurrency';
+    });
   }
 
   void _showInsufficientGoldMessage() {
-    // Throttle snackbar to once every 2 seconds
-    final now = DateTime.now();
-    if (_lastInsufficientFundsSnackbar != null &&
-        now.difference(_lastInsufficientFundsSnackbar!).inSeconds < 2) {
-      return;
-    }
-    _lastInsufficientFundsSnackbar = now;
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          'Insufficient gold. Available: ${_availableGoldHoldings.toStringAsFixed(3)}g',
-        ),
-        backgroundColor: AppColors.errorRed,
-        duration: const Duration(seconds: 2),
-      ),
-    );
+    setState(() {
+      _errorMessage =
+          'Insufficient gold. Available: ${_availableGoldHoldings.toStringAsFixed(3)}g';
+    });
   }
 
   Future<void> _fetchBalance() async {
@@ -448,6 +425,7 @@ class _TradeConfirmationPageState extends State<TradeConfirmationPage> {
                     keyboardType:
                         const TextInputType.numberWithOptions(decimal: true),
                     inputFormatters: [
+                      LengthLimitingTextInputFormatter(4),
                       FilteringTextInputFormatter.allow(
                           RegExp(r'^\d*\.?\d{0,3}')),
                       if (widget.isBuy)
@@ -465,6 +443,8 @@ class _TradeConfirmationPageState extends State<TradeConfirmationPage> {
                     style: const TextStyle(
                         color: AppColors.whiteText, fontSize: 24),
                     decoration: InputDecoration(
+                      errorText: _errorMessage,
+                      errorStyle: const TextStyle(color: AppColors.errorRed),
                       suffixText: 'grams',
                       suffixStyle:
                           const TextStyle(color: AppColors.primaryGold),
@@ -476,6 +456,14 @@ class _TradeConfirmationPageState extends State<TradeConfirmationPage> {
                       focusedBorder: OutlineInputBorder(
                         borderSide:
                             const BorderSide(color: AppColors.primaryGold),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      errorBorder: OutlineInputBorder(
+                        borderSide: const BorderSide(color: AppColors.errorRed),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      focusedErrorBorder: OutlineInputBorder(
+                        borderSide: const BorderSide(color: AppColors.errorRed),
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
