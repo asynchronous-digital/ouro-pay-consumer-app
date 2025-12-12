@@ -55,4 +55,4 @@ app.*.map.json
 !.env.example
 
 # FVM Version Cache
-.fvm/
+.fvm/ios/build/

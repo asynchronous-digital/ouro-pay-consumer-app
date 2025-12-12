@@ -351,9 +351,38 @@ class _KycStatusPageState extends State<KycStatusPage> {
       return;
     }
 
-    if (_documentFront == null && _documentBack == null && _selfie == null) {
+    // Recalculate requirements to validate
+    final requiredDocs = _requirements?.requiredDocs ?? [];
+    final showAll = requiredDocs.isEmpty;
+    final showIdCard = showAll || requiredDocs.contains('ID_CARD');
+    final showPassport = showAll || requiredDocs.contains('PASSPORT');
+    final showDriverLicense =
+        showAll || requiredDocs.contains('DRIVERS_LICENSE');
+    final showSelfie = showAll || requiredDocs.contains('SELFIE');
+
+    final bool askFront = showIdCard || showPassport || showDriverLicense;
+    final bool askBack = showIdCard || showDriverLicense;
+    final bool askSelfie = showSelfie;
+
+    if (askFront && _documentFront == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please upload at least one document')),
+        const SnackBar(
+            content: Text('Please upload the front side of the document')),
+      );
+      return;
+    }
+
+    if (askBack && _documentBack == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+            content: Text('Please upload the back side of the document')),
+      );
+      return;
+    }
+
+    if (askSelfie && _selfie == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please take a selfie')),
       );
       return;
     }

@@ -58,8 +58,10 @@ class _TradeConfirmationPageState extends State<TradeConfirmationPage> {
     setState(() {
       _totalValue = grams * _currentPricePerGram;
 
-      // Check for insufficient funds immediately
-      if (widget.isBuy && _totalValue > _availableBalance) {
+      // Check for validation errors
+      if (widget.isBuy && grams > 1000) {
+        _errorMessage = 'Maximum purchase limit is 1000 grams';
+      } else if (widget.isBuy && _totalValue > _availableBalance) {
         _errorMessage =
             'Insufficient funds. Available: ${_availableBalance.toStringAsFixed(2)} $_selectedCurrency';
       } else if (!widget.isBuy && grams > _availableGoldHoldings) {
@@ -184,6 +186,16 @@ class _TradeConfirmationPageState extends State<TradeConfirmationPage> {
     if (grams == null || grams <= 0) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please enter a valid amount')),
+      );
+      return;
+    }
+
+    if (widget.isBuy && grams > 1000) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Maximum purchase limit is 1000 grams'),
+          backgroundColor: AppColors.errorRed,
+        ),
       );
       return;
     }
@@ -383,11 +395,11 @@ class _TradeConfirmationPageState extends State<TradeConfirmationPage> {
   Widget build(BuildContext context) {
     final action = widget.isBuy ? 'Buy' : 'Sell';
     final color = widget.isBuy ? AppColors.successGreen : AppColors.errorRed;
+    final grams = double.tryParse(_gramsController.text) ?? 0.0;
     final hasInsufficientFunds =
         widget.isBuy && _totalValue > _availableBalance;
-    final hasInsufficientGold = !widget.isBuy &&
-        (double.tryParse(_gramsController.text) ?? 0.0) >
-            _availableGoldHoldings;
+    final hasInsufficientGold = !widget.isBuy && grams > _availableGoldHoldings;
+    final exceedsLimit = widget.isBuy && grams > 1000;
 
     return Scaffold(
       appBar: AppBar(
@@ -456,13 +468,22 @@ class _TradeConfirmationPageState extends State<TradeConfirmationPage> {
                       LengthLimitingTextInputFormatter(10),
                       FilteringTextInputFormatter.allow(
                           RegExp(r'^\d*\.?\d{0,3}')),
-                      if (widget.isBuy)
+                      if (widget.isBuy) ...[
+                        MaxAmountFormatter(
+                          1000,
+                          onExceeded: () {
+                            setState(() {
+                              _errorMessage =
+                                  'Maximum purchase limit is 1000 grams';
+                            });
+                          },
+                        ),
                         MaxAffordableGramsFormatter(
                           _availableBalance,
                           _currentPricePerGram,
                           onExceeded: _showInsufficientFundsMessage,
-                        )
-                      else
+                        ),
+                      ] else
                         MaxAmountFormatter(
                           _availableGoldHoldings,
                           onExceeded: _showInsufficientGoldMessage,
@@ -631,7 +652,8 @@ class _TradeConfirmationPageState extends State<TradeConfirmationPage> {
                       onPressed: _isLoading ||
                               _isPriceLoading ||
                               hasInsufficientFunds ||
-                              hasInsufficientGold
+                              hasInsufficientGold ||
+                              exceedsLimit
                           ? null
                           : _confirmTrade,
                       style: ElevatedButton.styleFrom(
@@ -650,11 +672,13 @@ class _TradeConfirmationPageState extends State<TradeConfirmationPage> {
                                   color: Colors.white, strokeWidth: 2),
                             )
                           : Text(
-                              hasInsufficientFunds
-                                  ? 'Insufficient Funds'
-                                  : hasInsufficientGold
-                                      ? 'Insufficient Gold'
-                                      : 'Confirm $action',
+                              exceedsLimit
+                                  ? 'Limit Exceeded'
+                                  : hasInsufficientFunds
+                                      ? 'Insufficient Funds'
+                                      : hasInsufficientGold
+                                          ? 'Insufficient Gold'
+                                          : 'Confirm $action',
                               style: const TextStyle(
                                   fontSize: 18, fontWeight: FontWeight.bold),
                             ),
