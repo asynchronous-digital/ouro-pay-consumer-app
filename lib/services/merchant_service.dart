@@ -4,6 +4,7 @@ import 'package:ouro_pay_consumer_app/config/app_config.dart';
 import 'package:ouro_pay_consumer_app/services/auth_service.dart';
 import 'package:ouro_pay_consumer_app/models/merchant_payment_info.dart';
 import 'package:ouro_pay_consumer_app/models/merchant_transaction_models.dart';
+import 'package:ouro_pay_consumer_app/models/payment_history_models.dart';
 
 class MerchantService {
   static final MerchantService _instance = MerchantService._internal();
@@ -208,6 +209,66 @@ class MerchantService {
     } catch (e) {
       print('❌ Error paying merchant: $e');
       return MerchantPaymentResponse(
+        success: false,
+        message: e.toString(),
+      );
+    }
+  }
+
+  /// Get payment history
+  /// GET {{base_url}}/payments/history?per_page=15
+  Future<PaymentHistoryResponse> getPaymentHistory({int perPage = 15}) async {
+    try {
+      final authService = AuthService();
+      final token = await authService.getToken();
+
+      if (token == null) {
+        return PaymentHistoryResponse(
+          success: false,
+          message: 'No authentication token found',
+        );
+      }
+
+      final url = Uri.parse('$_baseUrl/payments/history?per_page=$perPage');
+
+      print('🔵 GET PAYMENT HISTORY API CALL');
+      print('📍 URL: $url');
+
+      final response = await http.get(
+        url,
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
+      ).timeout(
+        AppConfig.connectionTimeout,
+        onTimeout: () {
+          throw Exception(
+              'Connection timeout. Please check your internet connection.');
+        },
+      );
+
+      print('📥 Response Status Code: ${response.statusCode}');
+      // Truncate long response for logging
+      final bodyToLog = response.body.length > 500
+          ? '${response.body.substring(0, 500)}...'
+          : response.body;
+      print('📥 Response Body: $bodyToLog');
+
+      if (response.body.isEmpty) {
+        return PaymentHistoryResponse(
+          success: false,
+          message: 'Empty response from server',
+        );
+      }
+
+      final Map<String, dynamic> responseData = jsonDecode(response.body);
+
+      return PaymentHistoryResponse.fromJson(responseData);
+    } catch (e) {
+      print('❌ Error fetching payment history: $e');
+      return PaymentHistoryResponse(
         success: false,
         message: e.toString(),
       );

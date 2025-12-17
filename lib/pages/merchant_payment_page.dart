@@ -27,6 +27,9 @@ class _MerchantPaymentPageState extends State<MerchantPaymentPage> {
   }
 
   Future<void> _processPayment() async {
+    // Dismiss keyboard
+    FocusScope.of(context).unfocus();
+
     if (_formKey.currentState!.validate()) {
       setState(() {
         _isProcessing = true;
@@ -100,7 +103,7 @@ class _MerchantPaymentPageState extends State<MerchantPaymentPage> {
             const SizedBox(height: 12),
             _buildSummaryRow(
               'Gold Required',
-              '${data.goldRequired.toStringAsFixed(4)} g',
+              '${data.goldRequired.toStringAsFixed(3)} g',
               isBold: true,
               valueColor: AppColors.primaryGold,
             ),
@@ -130,7 +133,7 @@ class _MerchantPaymentPageState extends State<MerchantPaymentPage> {
                             ),
                           ),
                           Text(
-                            'You have ${data.consumerGoldBalance.toStringAsFixed(4)} g',
+                            'You have ${data.consumerGoldBalance.toStringAsFixed(3)} g',
                             style: const TextStyle(color: AppColors.errorRed),
                           ),
                         ],
@@ -160,20 +163,26 @@ class _MerchantPaymentPageState extends State<MerchantPaymentPage> {
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed:
-                    data.sufficientBalance ? () => _confirmPayment(data) : null,
+                onPressed: data.sufficientBalance
+                    ? () => _confirmPayment(data)
+                    : () => Navigator.pop(context),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primaryGold,
-                  foregroundColor: AppColors.darkBackground,
+                  backgroundColor: data.sufficientBalance
+                      ? AppColors.primaryGold
+                      : AppColors.surfaceColor,
+                  foregroundColor: data.sufficientBalance
+                      ? AppColors.darkBackground
+                      : AppColors.whiteText,
                   disabledBackgroundColor:
                       AppColors.primaryGold.withOpacity(0.3),
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12)),
                 ),
-                child: const Text(
-                  'Confirm & Pay',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                child: Text(
+                  data.sufficientBalance ? 'Confirm & Pay' : 'Close',
+                  style: const TextStyle(
+                      fontSize: 18, fontWeight: FontWeight.bold),
                 ),
               ),
             ),
@@ -273,7 +282,8 @@ class _MerchantPaymentPageState extends State<MerchantPaymentPage> {
           TextButton(
             onPressed: () {
               Navigator.pop(context); // Close dialog
-              Navigator.pop(context); // Close Payment Page
+              Navigator.pop(
+                  context, true); // Close Payment Page with success result
             },
             child: const Text('Done',
                 style: TextStyle(color: AppColors.primaryGold)),
@@ -341,14 +351,6 @@ class _MerchantPaymentPageState extends State<MerchantPaymentPage> {
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
                         color: AppColors.darkBackground,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'ID: ${merchant.id}',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: AppColors.darkBackground.withOpacity(0.8),
                       ),
                     ),
                   ],
