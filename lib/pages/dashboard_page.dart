@@ -18,6 +18,7 @@ import 'package:flutter/services.dart';
 import 'package:ouro_pay_consumer_app/services/kyc_service.dart';
 import 'package:ouro_pay_consumer_app/pages/kyc_status_page.dart';
 import 'package:ouro_pay_consumer_app/models/user_profile.dart'; // Ensure this is imported
+import 'package:ouro_pay_consumer_app/pages/qr_scanner_page.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -487,6 +488,17 @@ class _DashboardPageState extends State<DashboardPage>
         ],
       ),
       actions: [
+        // QR Scanner
+        IconButton(
+          onPressed: () {
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => const QRScannerPage(),
+              ),
+            );
+          },
+          icon: const Icon(Icons.qr_code_scanner, color: AppColors.primaryGold),
+        ),
         // Gold points display
         Container(
           margin: const EdgeInsets.only(right: 8),
