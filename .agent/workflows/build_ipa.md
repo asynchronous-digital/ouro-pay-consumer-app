@@ -1,52 +1,49 @@
 ---
-description: Build IPA for TestFlight/App Store Distribution
+description: Build IPA for TestFlight/App Store Distribution (Reusable Workflow)
 ---
 
-This workflow describes how to build an IPA file for TestFlight or App Store distribution, specifically handling the `com.ouropay.consumer.development` bundle ID and Team ID `PC8N5PX8LJ`.
+This workflow outlines the robust process to build an IPA file for Flutter iOS apps, ensuring correct Bundle IDs and Display Names via `xcconfig`.
 
-# Prerequisites
+# 1. Versioning
+- Open `pubspec.yaml`
+- Increment the `version`: e.g., `1.0.1+2`
 
-1.  **Certificates**: Ensure you have a valid **Apple Distribution Certificate** in your Keychain for Team `PC8N5PX8LJ`.
-2.  **Provisioning Profiles**: Ensure Xcode has created/downloaded the necessary provisioning profiles (usually handled automatically by Xcode if the Team ID is correct).
-3.  **ExportOptions.plist**: Ensure `ios/ExportOptions.plist` exists and is configured correctly.
+# 2. Key Configuration (Crucial Step)
+Ensure your build configurations define the correct App Name and Bundle ID. This prevents the app from reverting to "Runner" or the wrong ID.
 
-# Configuration Check
+- **Check `ios/Flutter/Release.xcconfig`** (and `Debug.xcconfig` for local testing):
+  ```xcconfig
+  APP_DISPLAY_NAME=Your App Name
+  APP_BUNDLE_ID=com.example.your.bundle.id
+  ```
+  *(Make sure these match your target distribution profile)*
 
-1.  **Bundle ID**: Verify `PRODUCT_BUNDLE_IDENTIFIER` in `ios/Runner.xcodeproj/project.pbxproj` is set to `com.ouropay.consumer.development` (or your target bundle ID).
-2.  **Team ID**: Verify `DEVELOPMENT_TEAM` in `ios/Runner.xcodeproj/project.pbxproj` is set to `PC8N5PX8LJ`.
-3.  **Version/Build**: Increment the version/build number in `pubspec.yaml` (e.g., `version: 1.0.0+2`).
-
-# ExportOptions.plist Content
-
-Ensure `ios/ExportOptions.plist` contains the following (adjust Team ID if needed):
-
+# 3. Export Options
+Ensure `ios/ExportOptions.plist` exists with the correct Team ID:
 ```xml
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>method</key>
-	<string>app-store</string>
-	<key>teamID</key>
-	<string>PC8N5PX8LJ</string>
-	<key>uploadBitcode</key>
-	<false/>
-	<key>uploadSymbols</key>
-	<true/>
-	<key>compileBitcode</key>
-	<false/>
-	<key>signingStyle</key>
-	<string>automatic</string>
+    <key>method</key>
+    <string>app-store</string> <!-- or 'ad-hoc', 'development' -->
+    <key>teamID</key>
+    <string>YOUR_TEAM_ID</string>
+    <key>signingStyle</key>
+    <string>automatic</string>
+    <key>uploadBitcode</key>
+    <false/>
+    <key>uploadSymbols</key>
+    <true/>
 </dict>
 </plist>
 ```
 
-# Build Command
-
-Run the following command to clean, build the archive, and export the IPA:
+# 4. Build Command
+Run the following to clean and build:
 
 ```bash
-# 1. Clean (Optional but recommended)
+# 1. Clean environment
 fvm flutter clean
 fvm flutter pub get
 cd ios && pod install && cd ..
@@ -55,8 +52,10 @@ cd ios && pod install && cd ..
 fvm flutter build ipa --release --export-options-plist=ios/ExportOptions.plist
 ```
 
-# Upload
+# 5. Output
+- The IPA will be at: `build/ios/ipa/ouro_pay_consumer_app.ipa` (or project name).
 
-1.  Open **Transporter** app.
-2.  Drag and drop the generated IPA file from `build/ios/ipa/*.ipa`.
-3.  Click **Deliver**.
+# 6. Upload
+- Open **Transporter** app (macOS).
+- Drag and drop the generated `.ipa` file.
+- Click **Deliver**.

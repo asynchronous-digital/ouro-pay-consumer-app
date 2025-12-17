@@ -18,6 +18,9 @@ import 'package:flutter/services.dart';
 import 'package:ouro_pay_consumer_app/services/kyc_service.dart';
 import 'package:ouro_pay_consumer_app/pages/kyc_status_page.dart';
 import 'package:ouro_pay_consumer_app/models/user_profile.dart'; // Ensure this is imported
+import 'package:ouro_pay_consumer_app/services/merchant_service.dart';
+import 'package:ouro_pay_consumer_app/models/payment_history_models.dart';
+import 'package:ouro_pay_consumer_app/pages/qr_scanner_page.dart';
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -41,6 +44,8 @@ class _DashboardPageState extends State<DashboardPage>
   UserProfile? _userProfile; // User profile with KYC status and permissions
   bool _isLoadingProfile = false; // Loading state for user profile
   KycData? _kycData; // Direct KYC status data
+  List<PaymentHistoryItem> _paymentHistory = [];
+  bool _isLoadingPaymentHistory = false;
 
   @override
   void initState() {
@@ -52,6 +57,7 @@ class _DashboardPageState extends State<DashboardPage>
     _loadUserData();
     _loadGoldPrice(); // Load gold price for EUR by default
     _checkKycStatus(); // Check detailed KYC status
+    _loadPaymentHistory(); // Start loading payment history
   }
 
   Future<void> _checkKycStatus({bool withDelay = true}) async {
@@ -387,7 +393,46 @@ class _DashboardPageState extends State<DashboardPage>
       _loadWalletData(),
       _loadGoldHoldings(),
       _loadGoldPrice(),
+      _loadPaymentHistory(),
     ]);
+  }
+
+  Future<void> _loadPaymentHistory() async {
+    setState(() {
+      _isLoadingPaymentHistory = true;
+    });
+
+    try {
+      print('💸 Dashboard: Loading payment history');
+      final merchantService = MerchantService();
+      final response = await merchantService.getPaymentHistory();
+
+      if (mounted) {
+        if (response.success && response.data != null) {
+          setState(() {
+            _paymentHistory = response.data!.payments;
+            _isLoadingPaymentHistory = false;
+          });
+          print(
+              '  ✅ Dashboard: Payment history loaded - ${_paymentHistory.length} items');
+        } else {
+          print(
+              '  ⚠️ Dashboard: Failed to load payment history - ${response.message}');
+          setState(() {
+            _paymentHistory = [];
+            _isLoadingPaymentHistory = false;
+          });
+        }
+      }
+    } catch (e) {
+      print('  ❌ Dashboard: Error loading payment history: $e');
+      if (mounted) {
+        setState(() {
+          _paymentHistory = [];
+          _isLoadingPaymentHistory = false;
+        });
+      }
+    }
   }
 
   @override
@@ -619,8 +664,8 @@ class _DashboardPageState extends State<DashboardPage>
                 ),
                 const SizedBox(height: 4),
                 if (_goldPriceData != null)
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
                         'Buy: ${_goldPriceData!.getFormattedBuyPrice()} | Sell: ${_goldPriceData!.getFormattedSellPrice()}',
@@ -630,7 +675,32 @@ class _DashboardPageState extends State<DashboardPage>
                           fontWeight: FontWeight.w500,
                         ),
                       ),
-                      const SizedBox(height: 4),
+                      ElevatedButton.icon(
+                        onPressed: () async {
+                          final result = await Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (context) => const QRScannerPage(),
+                            ),
+                          );
+                          if (result == true && mounted) {
+                            print(
+                                '🔄 Dashboard: Payment successful, refreshing data...');
+                            _refreshData();
+                          }
+                        },
+                        icon: const Icon(Icons.qr_code_scanner, size: 14),
+                        label: const Text('Scan to Pay'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.darkBackground,
+                          foregroundColor: AppColors.primaryGold,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 8),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          textStyle: const TextStyle(
+                              fontSize: 12, fontWeight: FontWeight.bold),
+                        ),
+                      ),
                     ],
                   ),
               ],
@@ -1227,7 +1297,7 @@ class _DashboardPageState extends State<DashboardPage>
               Expanded(
                 child: _buildActionButton(
                   icon: Icons.list_alt,
-                  label: 'Transactions',
+                  label: 'Gold Transactions',
                   onPressed: _handleGoldTransactions,
                   backgroundColor: AppColors.secondaryGold,
                   isEnabled: _isKycApproved,
@@ -1576,6 +1646,129 @@ class _DashboardPageState extends State<DashboardPage>
             textColor: AppColors.primaryGold,
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildHistoryTab() {
+    if (_isLoadingPaymentHistory) {
+      return Shimmer.fromColors(
+        baseColor: AppColors.cardBackground,
+        highlightColor: AppColors
+            .surfaceColor, // Assuming this color exists, otherwise use a lighter grey
+        child: ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: 5,
+          itemBuilder: (context, index) => Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            height: 100,
+            decoration: BoxDecoration(
+              color: AppColors.cardBackground,
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (_paymentHistory.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.history_toggle_off,
+                size: 64, color: AppColors.greyText.withOpacity(0.5)),
+            const SizedBox(height: 16),
+            const Text(
+              'No transaction history',
+              style: TextStyle(color: AppColors.greyText),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: _loadPaymentHistory,
+      color: AppColors.primaryGold,
+      backgroundColor: AppColors.cardBackground,
+      child: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: _paymentHistory.length,
+        itemBuilder: (context, index) {
+          final payment = _paymentHistory[index];
+          return Card(
+            margin: const EdgeInsets.only(bottom: 12),
+            color: AppColors.cardBackground,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(
+                color: AppColors.primaryGold.withOpacity(0.1),
+                width: 1,
+              ),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        payment.merchant.name,
+                        style: const TextStyle(
+                          color: AppColors.whiteText,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                      Text(
+                        payment.fiat.formatted,
+                        style: const TextStyle(
+                          color: AppColors.primaryGold,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        '${payment.gold.amount.toStringAsFixed(4)}g Gold',
+                        style: const TextStyle(
+                          color: AppColors.greyText,
+                          fontSize: 14,
+                        ),
+                      ),
+                      Text(
+                        payment.createdAt.toString().split('.')[0],
+                        style: const TextStyle(
+                          color: AppColors.greyText,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (payment.status == 'completed') ...[
+                    const SizedBox(height: 4),
+                    const Text(
+                      'Completed',
+                      style: TextStyle(
+                        color: Colors.green,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          );
+        },
       ),
     );
   }
