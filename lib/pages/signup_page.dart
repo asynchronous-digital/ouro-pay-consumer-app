@@ -1628,10 +1628,11 @@ class _SignUpPageState extends State<SignUpPage> with TickerProviderStateMixin {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: _nextStep, // Always enabled for development
+              onPressed: _selfieCompleted ? _nextStep : null,
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primaryGold,
                 foregroundColor: AppColors.darkBackground,
+                disabledBackgroundColor: AppColors.greyText,
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
