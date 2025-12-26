@@ -253,7 +253,9 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
-                          onPressed: (_isLoading || !_isFormValid) ? null : _handleLogin,
+                          onPressed: (_isLoading || !_isFormValid)
+                              ? null
+                              : _handleLogin,
                           style: ElevatedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(vertical: 16),
                           ),
@@ -430,7 +432,7 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
     if (value == null || value.isEmpty) {
       return 'Please enter your email';
     }
-    if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
+    if (!RegExp(r'^[\w-\.\+]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
       return 'Please enter a valid email';
     }
     return null;
@@ -449,7 +451,7 @@ class _LoginPageState extends State<LoginPage> with TickerProviderStateMixin {
   void _checkFormValidity() {
     final email = _emailController.text.trim();
     final password = _passwordController.text;
-    
+
     setState(() {
       _isFormValid = email.isNotEmpty && password.isNotEmpty;
     });

@@ -211,7 +211,8 @@ class _DepositHistoryPageState extends State<DepositHistoryPage> {
     );
     // Refresh if money was added
     if (result == true && mounted) {
-      _loadDeposits();
+      // Return to dashboard with success flag so it can refresh
+      Navigator.pop(context, true);
     }
   }
 

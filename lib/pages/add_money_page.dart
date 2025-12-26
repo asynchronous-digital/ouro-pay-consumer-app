@@ -62,6 +62,16 @@ class _AddMoneyPageState extends State<AddMoneyPage> {
       return;
     }
 
+    if (amount > 1000000) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Maximum deposit amount is 1,000,000'),
+          backgroundColor: AppColors.errorRed,
+        ),
+      );
+      return;
+    }
+
     if (_notesController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -374,6 +384,17 @@ class _AddMoneyPageState extends State<AddMoneyPage> {
                       inputFormatters: [
                         FilteringTextInputFormatter.allow(
                             RegExp(r'^\d*\.?\d{0,2}')),
+                        TextInputFormatter.withFunction(
+                          (oldValue, newValue) {
+                            if (newValue.text.isEmpty) return newValue;
+                            final double? value =
+                                double.tryParse(newValue.text);
+                            if (value != null && value > 1000000) {
+                              return oldValue;
+                            }
+                            return newValue;
+                          },
+                        ),
                       ],
                       style: const TextStyle(
                         color: AppColors.whiteText,

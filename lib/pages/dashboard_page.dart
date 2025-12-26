@@ -1793,8 +1793,8 @@ class _DashboardPageState extends State<DashboardPage>
       margin: const EdgeInsets.only(bottom: 16),
       child: Card(
         child: InkWell(
-          onTap: () {
-            Navigator.push(
+          onTap: () async {
+            final result = await Navigator.push(
               context,
               MaterialPageRoute(
                 builder: (context) => DepositHistoryPage(
@@ -1802,6 +1802,12 @@ class _DashboardPageState extends State<DashboardPage>
                 ),
               ),
             );
+
+            if (result == true && mounted) {
+              print(
+                  '💰 Dashboard: Returned from history with change, refreshing...');
+              _refreshData();
+            }
           },
           borderRadius: BorderRadius.circular(16),
           child: Padding(
