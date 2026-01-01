@@ -1,7 +1,6 @@
 import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'package:ouro_pay_consumer_app/services/http_service.dart';
 import 'package:ouro_pay_consumer_app/config/app_config.dart';
-import 'package:ouro_pay_consumer_app/services/auth_service.dart';
 import 'package:ouro_pay_consumer_app/models/merchant_payment_info.dart';
 import 'package:ouro_pay_consumer_app/models/merchant_transaction_models.dart';
 import 'package:ouro_pay_consumer_app/models/payment_history_models.dart';
@@ -18,36 +17,13 @@ class MerchantService {
   Future<MerchantInfoResponse> getMerchantInfo(
       int merchantId, String currency) async {
     try {
-      final authService = AuthService();
-      final token = await authService.getToken();
-
-      if (token == null) {
-        return MerchantInfoResponse(
-          success: false,
-          message: 'No authentication token found',
-        );
-      }
-
       final url = Uri.parse(
           '$_baseUrl/payments/merchant/$merchantId?currency=$currency');
 
       print('🔵 GET MERCHANT INFO API CALL');
       print('📍 URL: $url');
 
-      final response = await http.get(
-        url,
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      ).timeout(
-        AppConfig.connectionTimeout,
-        onTimeout: () {
-          throw Exception(
-              'Connection timeout. Please check your internet connection.');
-        },
-      );
+      final response = await HttpService.get(url);
 
       print('📥 Response Status Code: ${response.statusCode}');
       print('📥 Response Body: ${response.body}');
@@ -83,16 +59,6 @@ class MerchantService {
   Future<GoldCalculationResponse> calculatePayment(
       double amount, String currency, int merchantId) async {
     try {
-      final authService = AuthService();
-      final token = await authService.getToken();
-
-      if (token == null) {
-        return GoldCalculationResponse(
-          success: false,
-          message: 'No authentication token found',
-        );
-      }
-
       final url = Uri.parse('$_baseUrl/payments/calculate');
       final body = jsonEncode({
         'amount': amount,
@@ -104,23 +70,7 @@ class MerchantService {
       print('📍 URL: $url');
       print('📦 Body: $body');
 
-      final response = await http
-          .post(
-        url,
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-        body: body,
-      )
-          .timeout(
-        AppConfig.connectionTimeout,
-        onTimeout: () {
-          throw Exception(
-              'Connection timeout. Please check your internet connection.');
-        },
-      );
+      final response = await HttpService.post(url, body: body);
 
       print('📥 Response Status Code: ${response.statusCode}');
       print('📥 Response Body: ${response.body}');
@@ -153,16 +103,6 @@ class MerchantService {
     required double confirmGoldAmount,
   }) async {
     try {
-      final authService = AuthService();
-      final token = await authService.getToken();
-
-      if (token == null) {
-        return MerchantPaymentResponse(
-          success: false,
-          message: 'No authentication token found',
-        );
-      }
-
       final url = Uri.parse('$_baseUrl/payments/pay-merchant');
       final body = jsonEncode({
         'merchant_id': merchantId,
@@ -175,23 +115,7 @@ class MerchantService {
       print('📍 URL: $url');
       print('📦 Body: $body');
 
-      final response = await http
-          .post(
-        url,
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-        body: body,
-      )
-          .timeout(
-        AppConfig.connectionTimeout,
-        onTimeout: () {
-          throw Exception(
-              'Connection timeout. Please check your internet connection.');
-        },
-      );
+      final response = await HttpService.post(url, body: body);
 
       print('📥 Response Status Code: ${response.statusCode}');
       print('📥 Response Body: ${response.body}');
@@ -217,37 +141,16 @@ class MerchantService {
 
   /// Get payment history
   /// GET {{base_url}}/payments/history?per_page=15
-  Future<PaymentHistoryResponse> getPaymentHistory({int perPage = 15}) async {
+  Future<PaymentHistoryResponse> getPaymentHistory(
+      {int perPage = 15, bool checkSuspension = true}) async {
     try {
-      final authService = AuthService();
-      final token = await authService.getToken();
-
-      if (token == null) {
-        return PaymentHistoryResponse(
-          success: false,
-          message: 'No authentication token found',
-        );
-      }
-
       final url = Uri.parse('$_baseUrl/payments/history?per_page=$perPage');
 
       print('🔵 GET PAYMENT HISTORY API CALL');
       print('📍 URL: $url');
 
-      final response = await http.get(
-        url,
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      ).timeout(
-        AppConfig.connectionTimeout,
-        onTimeout: () {
-          throw Exception(
-              'Connection timeout. Please check your internet connection.');
-        },
-      );
+      final response =
+          await HttpService.get(url, skipSuspensionCheck: !checkSuspension);
 
       print('📥 Response Status Code: ${response.statusCode}');
       // Truncate long response for logging

@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:ouro_pay_consumer_app/config/app_config.dart';
 import 'package:ouro_pay_consumer_app/services/auth_service.dart';
+import 'package:ouro_pay_consumer_app/services/http_service.dart';
 
 /// Enum for KYC verification status
 enum KycStatus {
@@ -511,20 +512,11 @@ class KycService {
   /// Get current KYC status from backend
   Future<KycData?> getKycStatus() async {
     try {
-      final token = await _authService.getToken();
-      if (token == null) return null;
-
       final url = Uri.parse('$_baseUrl/kyc/status');
 
       print('🔍 Checking KYC Status: $url');
 
-      final response = await http.get(
-        url,
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Accept': 'application/json',
-        },
-      ).timeout(const Duration(seconds: 10));
+      final response = await HttpService.get(url);
 
       print(
           '📥 KYC Status Response: ${response.statusCode} - ${response.body}');
@@ -548,19 +540,10 @@ class KycService {
   /// Get detailed requirements for KYC resubmission
   Future<KycRequirements?> getKycRequirements() async {
     try {
-      final token = await _authService.getToken();
-      if (token == null) return null;
-
       final url = Uri.parse('$_baseUrl/kyc/requirements');
       print('🔍 Checking KYC Requirements: $url');
 
-      final response = await http.get(
-        url,
-        headers: {
-          'Authorization': 'Bearer $token',
-          'Accept': 'application/json',
-        },
-      ).timeout(const Duration(seconds: 10));
+      final response = await HttpService.get(url);
 
       print(
           '📥 KYC Requirements Response: ${response.statusCode} - ${response.body}');
@@ -627,6 +610,9 @@ class KycService {
       print('📤 Sending request...');
       final streamedResponse = await request.send();
       final response = await http.Response.fromStream(streamedResponse);
+
+      // Check status via HttpService to handle 403 globally
+      await HttpService.checkStatus(response);
 
       print('📥 KYC Resubmit Response Code: ${response.statusCode}');
       print('📥 KYC Resubmit Response Body: ${response.body}');

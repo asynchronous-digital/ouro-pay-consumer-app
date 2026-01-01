@@ -1,7 +1,6 @@
 import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'package:ouro_pay_consumer_app/services/http_service.dart';
 import 'package:ouro_pay_consumer_app/config/app_config.dart';
-import 'package:ouro_pay_consumer_app/services/auth_service.dart';
 
 /// Gold holdings data model
 class GoldHoldingsData {
@@ -106,333 +105,6 @@ class GoldHoldingsResponse {
       message: json['message'],
       data: data,
     );
-  }
-}
-
-/// Gold service for managing gold holdings
-class GoldService {
-  static final GoldService _instance = GoldService._internal();
-  factory GoldService() => _instance;
-  GoldService._internal();
-
-  /// Get the full API base URL
-  String get _baseUrl => AppConfig.baseUrl;
-
-  /// Get user's gold holdings
-  ///
-  /// Makes a GET request to {{base_url}}/gold/holdings
-  /// Requires authentication token in header
-  Future<GoldHoldingsResponse> getGoldHoldings() async {
-    try {
-      final authService = AuthService();
-      final token = await authService.getToken();
-
-      if (token == null) {
-        return GoldHoldingsResponse(
-          success: false,
-          message: 'No authentication token found',
-        );
-      }
-
-      final url = Uri.parse('$_baseUrl/gold/holdings');
-
-      print('🔵 GET GOLD HOLDINGS API CALL');
-      print('📍 URL: $url');
-      print('🔑 Token: ${token.substring(0, 20)}...');
-
-      final response = await http.get(
-        url,
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      ).timeout(
-        AppConfig.connectionTimeout,
-        onTimeout: () {
-          throw Exception(
-              'Connection timeout. Please check your internet connection.');
-        },
-      );
-
-      print('📥 Response Status Code: ${response.statusCode}');
-      print('📥 Response Body: ${response.body}');
-
-      // Handle empty response body
-      if (response.body.isEmpty) {
-        return GoldHoldingsResponse(
-          success: false,
-          message: 'Empty response from server. Please try again.',
-        );
-      }
-
-      Map<String, dynamic> responseData;
-      try {
-        responseData = jsonDecode(response.body) as Map<String, dynamic>;
-        print('📋 Parsed Response Data: $responseData');
-      } catch (e) {
-        print('❌ Failed to parse response: $e');
-        return GoldHoldingsResponse(
-          success: false,
-          message: 'Invalid response format from server. Please try again.',
-        );
-      }
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        final goldResponse = GoldHoldingsResponse.fromJson(responseData);
-        print(
-            '✅ Gold holdings retrieved: ${goldResponse.data?.totalGrams ?? 0} grams');
-        return goldResponse;
-      } else {
-        // Handle error response
-        return GoldHoldingsResponse(
-          success: false,
-          message: responseData['message'] ??
-              responseData['error'] ??
-              'Failed to retrieve gold holdings. Please try again.',
-        );
-      }
-    } catch (e) {
-      // Handle network errors, timeouts, etc.
-      String errorMessage = 'An error occurred. Please try again.';
-
-      if (e.toString().contains('timeout')) {
-        errorMessage =
-            'Connection timeout. Please check your internet connection.';
-      } else if (e.toString().contains('SocketException') ||
-          e.toString().contains('Failed host lookup')) {
-        errorMessage = 'No internet connection. Please check your network.';
-      } else if (e.toString().contains('FormatException')) {
-        errorMessage = 'Invalid response from server. Please try again.';
-      }
-
-      print('❌ Error fetching gold holdings: $e');
-
-      return GoldHoldingsResponse(
-        success: false,
-        message: errorMessage,
-      );
-    }
-  }
-
-  /// Get gold price for a specific currency
-  ///
-  /// Makes a GET request to {{base_url}}/gold/price?currency={currency}
-  /// Requires authentication token in header
-  Future<GoldPriceResponse> getGoldPrice(String currency) async {
-    try {
-      final authService = AuthService();
-      final token = await authService.getToken();
-
-      if (token == null) {
-        return GoldPriceResponse(
-          success: false,
-          message: 'No authentication token found',
-        );
-      }
-
-      final url = Uri.parse('$_baseUrl/gold/price?currency=$currency');
-
-      print('🔵 GET GOLD PRICE API CALL');
-      print('📍 URL: $url');
-      print('💱 Currency: $currency');
-
-      final response = await http.get(
-        url,
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      ).timeout(
-        AppConfig.connectionTimeout,
-        onTimeout: () {
-          throw Exception(
-              'Connection timeout. Please check your internet connection.');
-        },
-      );
-
-      print('📥 Response Status Code: ${response.statusCode}');
-      print('📥 Response Body: ${response.body}');
-
-      if (response.body.isEmpty) {
-        return GoldPriceResponse(
-          success: false,
-          message: 'Empty response from server. Please try again.',
-        );
-      }
-
-      Map<String, dynamic> responseData;
-      try {
-        responseData = jsonDecode(response.body) as Map<String, dynamic>;
-        print('📋 Parsed Response Data: $responseData');
-      } catch (e) {
-        print('❌ Failed to parse response: $e');
-        return GoldPriceResponse(
-          success: false,
-          message: 'Invalid response format from server. Please try again.',
-        );
-      }
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        final priceResponse = GoldPriceResponse.fromJson(responseData);
-        print(
-            '✅ Gold price retrieved: ${priceResponse.data?.buyPrice ?? 0} ${priceResponse.data?.currency ?? currency}');
-        return priceResponse;
-      } else {
-        return GoldPriceResponse(
-          success: false,
-          message: responseData['message'] ??
-              responseData['error'] ??
-              'Failed to retrieve gold price. Please try again.',
-        );
-      }
-    } catch (e) {
-      String errorMessage = 'An error occurred. Please try again.';
-
-      if (e.toString().contains('timeout')) {
-        errorMessage =
-            'Connection timeout. Please check your internet connection.';
-      } else if (e.toString().contains('SocketException') ||
-          e.toString().contains('Failed host lookup')) {
-        errorMessage = 'No internet connection. Please check your network.';
-      } else if (e.toString().contains('FormatException')) {
-        errorMessage = 'Invalid response from server. Please try again.';
-      }
-
-      print('❌ Error fetching gold price: $e');
-
-      return GoldPriceResponse(
-        success: false,
-        message: errorMessage,
-      );
-    }
-  }
-
-  // ---------------------------------------------------------------------
-  // BUY GOLD
-  // ---------------------------------------------------------------------
-  /// Buy gold for a specific currency and amount (grams)
-  /// POST {{base_url}}/gold/buy with body {"grams":..., "currency_code":...}
-  Future<GoldActionResponse> buyGold(
-      {required String currency, required double grams}) async {
-    try {
-      final authService = AuthService();
-      final token = await authService.getToken();
-      if (token == null) {
-        return GoldActionResponse(
-            success: false, message: 'No authentication token found');
-      }
-      final url = Uri.parse('$_baseUrl/gold/buy');
-      final body = jsonEncode({'grams': grams, 'currency_code': currency});
-      final response = await http
-          .post(url,
-              headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                'Authorization': 'Bearer $token',
-              },
-              body: body)
-          .timeout(AppConfig.connectionTimeout, onTimeout: () {
-        throw Exception(
-            'Connection timeout. Please check your internet connection.');
-      });
-
-      if (response.body.isEmpty) {
-        return GoldActionResponse(
-            success: false, message: 'Empty response from server');
-      }
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
-      return GoldActionResponse(
-        success: data['success'] ?? false,
-        message: data['message'] ?? 'Buy gold request completed',
-        errors: data['errors'] != null
-            ? data['errors'] as Map<String, dynamic>
-            : null,
-      );
-    } catch (e) {
-      return GoldActionResponse(success: false, message: e.toString());
-    }
-  }
-
-  // ---------------------------------------------------------------------
-  // SELL GOLD
-  // ---------------------------------------------------------------------
-  /// Sell gold for a specific currency and amount (grams)
-  /// POST {{base_url}}/gold/sell with body {"grams":..., "currency_code":...}
-  Future<GoldActionResponse> sellGold(
-      {required String currency, required double grams}) async {
-    try {
-      final authService = AuthService();
-      final token = await authService.getToken();
-      if (token == null) {
-        return GoldActionResponse(
-            success: false, message: 'No authentication token found');
-      }
-      final url = Uri.parse('$_baseUrl/gold/sell');
-      final body = jsonEncode({'grams': grams, 'currency_code': currency});
-      final response = await http
-          .post(url,
-              headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                'Authorization': 'Bearer $token',
-              },
-              body: body)
-          .timeout(AppConfig.connectionTimeout, onTimeout: () {
-        throw Exception(
-            'Connection timeout. Please check your internet connection.');
-      });
-
-      if (response.body.isEmpty) {
-        return GoldActionResponse(
-            success: false, message: 'Empty response from server');
-      }
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
-      return GoldActionResponse(
-        success: data['success'] ?? false,
-        message: data['message'] ?? 'Sell gold request completed',
-        errors: data['errors'] != null
-            ? data['errors'] as Map<String, dynamic>
-            : null,
-      );
-    } catch (e) {
-      return GoldActionResponse(success: false, message: e.toString());
-    }
-  }
-
-  // ---------------------------------------------------------------------
-  // FETCH TRANSACTIONS
-  // ---------------------------------------------------------------------
-  /// Retrieve gold transaction history
-  /// GET {{base_url}}/gold/transactions
-  Future<GoldTransactionsResponse> getGoldTransactions() async {
-    try {
-      final authService = AuthService();
-      final token = await authService.getToken();
-      if (token == null) {
-        return GoldTransactionsResponse(
-            success: false, message: 'No authentication token found');
-      }
-      final url = Uri.parse('$_baseUrl/gold/transactions');
-      final response = await http.get(url, headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'Authorization': 'Bearer $token',
-      }).timeout(AppConfig.connectionTimeout, onTimeout: () {
-        throw Exception(
-            'Connection timeout. Please check your internet connection.');
-      });
-
-      if (response.body.isEmpty) {
-        return GoldTransactionsResponse(
-            success: false, message: 'Empty response from server');
-      }
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
-      return GoldTransactionsResponse.fromJson(data);
-    } catch (e) {
-      return GoldTransactionsResponse(success: false, message: e.toString());
-    }
   }
 }
 
@@ -551,5 +223,217 @@ class GoldTransactionsResponse {
       message: json['message'],
       data: json['data']?['data'] as List<dynamic>?,
     );
+  }
+}
+
+/// Gold service for managing gold holdings
+class GoldService {
+  static final GoldService _instance = GoldService._internal();
+  factory GoldService() => _instance;
+  GoldService._internal();
+
+  /// Get the full API base URL
+  String get _baseUrl => AppConfig.baseUrl;
+
+  /// Get user's gold holdings
+  ///
+  /// Makes a GET request to {{base_url}}/gold/holdings
+  /// Requires authentication token in header
+  Future<GoldHoldingsResponse> getGoldHoldings(
+      {bool checkSuspension = true}) async {
+    try {
+      final url = Uri.parse('$_baseUrl/gold/holdings');
+
+      print('🔵 GET GOLD HOLDINGS API CALL');
+      print('📍 URL: $url');
+
+      final response =
+          await HttpService.get(url, skipSuspensionCheck: !checkSuspension);
+
+      print('📥 Response Status Code: ${response.statusCode}');
+      print('📥 Response Body: ${response.body}');
+
+      // Handle empty response body
+      if (response.body.isEmpty) {
+        return GoldHoldingsResponse(
+          success: false,
+          message: 'Empty response from server. Please try again.',
+        );
+      }
+
+      Map<String, dynamic> responseData;
+      try {
+        responseData = jsonDecode(response.body) as Map<String, dynamic>;
+        print('📋 Parsed Response Data: $responseData');
+      } catch (e) {
+        print('❌ Failed to parse response: $e');
+        return GoldHoldingsResponse(
+          success: false,
+          message: 'Invalid response format from server. Please try again.',
+        );
+      }
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final goldResponse = GoldHoldingsResponse.fromJson(responseData);
+        print(
+            '✅ Gold holdings retrieved: ${goldResponse.data?.totalGrams ?? 0} grams');
+        return goldResponse;
+      } else {
+        // Handle error response
+        return GoldHoldingsResponse(
+          success: false,
+          message: responseData['message'] ??
+              responseData['error'] ??
+              'Failed to retrieve gold holdings. Please try again.',
+        );
+      }
+    } catch (e) {
+      print('❌ Error fetching gold holdings: $e');
+      return GoldHoldingsResponse(
+        success: false,
+        message: 'Error: $e',
+      );
+    }
+  }
+
+  /// Get gold price for a specific currency
+  ///
+  /// Makes a GET request to {{base_url}}/gold/price?currency={currency}
+  /// Requires authentication token in header
+  Future<GoldPriceResponse> getGoldPrice(String currency,
+      {bool checkSuspension = true}) async {
+    try {
+      final url = Uri.parse('$_baseUrl/gold/price?currency=$currency');
+
+      print('🔵 GET GOLD PRICE API CALL');
+      print('📍 URL: $url');
+      print('💱 Currency: $currency');
+
+      final response =
+          await HttpService.get(url, skipSuspensionCheck: !checkSuspension);
+
+      print('📥 Response Status Code: ${response.statusCode}');
+      print('📥 Response Body: ${response.body}');
+
+      if (response.body.isEmpty) {
+        return GoldPriceResponse(
+          success: false,
+          message: 'Empty response from server. Please try again.',
+        );
+      }
+
+      Map<String, dynamic> responseData;
+      try {
+        responseData = jsonDecode(response.body) as Map<String, dynamic>;
+        print('📋 Parsed Response Data: $responseData');
+      } catch (e) {
+        print('❌ Failed to parse response: $e');
+        return GoldPriceResponse(
+          success: false,
+          message: 'Invalid response format from server. Please try again.',
+        );
+      }
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final priceResponse = GoldPriceResponse.fromJson(responseData);
+        print(
+            '✅ Gold price retrieved: ${priceResponse.data?.buyPrice ?? 0} ${priceResponse.data?.currency ?? currency}');
+        return priceResponse;
+      } else {
+        return GoldPriceResponse(
+          success: false,
+          message: responseData['message'] ??
+              responseData['error'] ??
+              'Failed to retrieve gold price. Please try again.',
+        );
+      }
+    } catch (e) {
+      print('❌ Error fetching gold price: $e');
+      return GoldPriceResponse(
+        success: false,
+        message: 'Error: $e',
+      );
+    }
+  }
+
+  // ---------------------------------------------------------------------
+  // BUY GOLD
+  // ---------------------------------------------------------------------
+  /// Buy gold for a specific currency and amount (grams)
+  /// POST {{base_url}}/gold/buy with body {"grams":..., "currency_code":...}
+  Future<GoldActionResponse> buyGold(
+      {required String currency, required double grams}) async {
+    try {
+      final url = Uri.parse('$_baseUrl/gold/buy');
+      final body = jsonEncode({'grams': grams, 'currency_code': currency});
+
+      final response = await HttpService.post(url, body: body);
+
+      if (response.body.isEmpty) {
+        return GoldActionResponse(
+            success: false, message: 'Empty response from server');
+      }
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      return GoldActionResponse(
+        success: data['success'] ?? false,
+        message: data['message'] ?? 'Buy gold request completed',
+        errors: data['errors'] != null
+            ? data['errors'] as Map<String, dynamic>
+            : null,
+      );
+    } catch (e) {
+      return GoldActionResponse(success: false, message: e.toString());
+    }
+  }
+
+  // ---------------------------------------------------------------------
+  // SELL GOLD
+  // ---------------------------------------------------------------------
+  /// Sell gold for a specific currency and amount (grams)
+  /// POST {{base_url}}/gold/sell with body {"grams":..., "currency_code":...}
+  Future<GoldActionResponse> sellGold(
+      {required String currency, required double grams}) async {
+    try {
+      final url = Uri.parse('$_baseUrl/gold/sell');
+      final body = jsonEncode({'grams': grams, 'currency_code': currency});
+
+      final response = await HttpService.post(url, body: body);
+
+      if (response.body.isEmpty) {
+        return GoldActionResponse(
+            success: false, message: 'Empty response from server');
+      }
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      return GoldActionResponse(
+        success: data['success'] ?? false,
+        message: data['message'] ?? 'Sell gold request completed',
+        errors: data['errors'] != null
+            ? data['errors'] as Map<String, dynamic>
+            : null,
+      );
+    } catch (e) {
+      return GoldActionResponse(success: false, message: e.toString());
+    }
+  }
+
+  // ---------------------------------------------------------------------
+  // FETCH TRANSACTIONS
+  // ---------------------------------------------------------------------
+  /// Retrieve gold transaction history
+  /// GET {{base_url}}/gold/transactions
+  Future<GoldTransactionsResponse> getGoldTransactions() async {
+    try {
+      final url = Uri.parse('$_baseUrl/gold/transactions');
+      final response = await HttpService.get(url);
+
+      if (response.body.isEmpty) {
+        return GoldTransactionsResponse(
+            success: false, message: 'Empty response from server');
+      }
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      return GoldTransactionsResponse.fromJson(data);
+    } catch (e) {
+      return GoldTransactionsResponse(success: false, message: e.toString());
+    }
   }
 }

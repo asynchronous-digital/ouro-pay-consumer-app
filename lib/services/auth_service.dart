@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:ouro_pay_consumer_app/services/http_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:ouro_pay_consumer_app/config/app_config.dart';
 import 'package:ouro_pay_consumer_app/models/user.dart';
@@ -672,20 +673,7 @@ class AuthService {
       if (token != null) {
         try {
           final url = Uri.parse('$_baseUrl/auth/logout');
-          await http.post(
-            url,
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-              'Authorization': 'Bearer $token',
-            },
-          ).timeout(
-            const Duration(seconds: 5),
-            onTimeout: () {
-              // If logout API fails, still clear local token
-              return http.Response('', 408);
-            },
-          );
+          await HttpService.post(url);
         } catch (e) {
           // If API call fails, still proceed with local logout
           // This ensures user can always logout even if API is unavailable
@@ -935,20 +923,7 @@ class AuthService {
         );
       }
 
-      final response = await http.get(
-        url,
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      ).timeout(
-        AppConfig.connectionTimeout,
-        onTimeout: () {
-          throw Exception(
-              'Connection timeout. Please check your internet connection.');
-        },
-      );
+      final response = await HttpService.get(url);
 
       print('📥 Response Status Code: ${response.statusCode}');
       print('📥 Response Body: ${response.body}');

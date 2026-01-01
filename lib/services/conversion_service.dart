@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'package:ouro_pay_consumer_app/services/http_service.dart';
 import 'package:ouro_pay_consumer_app/config/app_config.dart';
 import 'package:ouro_pay_consumer_app/models/conversion.dart';
 import 'package:ouro_pay_consumer_app/services/auth_service.dart';
@@ -40,20 +40,7 @@ class ConversionService {
       print('📍 URL: $url');
       print('🔑 Token: ${token.substring(0, 20)}...');
 
-      final response = await http.get(
-        url,
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      ).timeout(
-        AppConfig.connectionTimeout,
-        onTimeout: () {
-          throw Exception(
-              'Connection timeout. Please check your internet connection.');
-        },
-      );
+      final response = await HttpService.get(url);
 
       print('📥 Response Status Code: ${response.statusCode}');
       print('📥 Response Body: ${response.body}');
@@ -133,22 +120,9 @@ class ConversionService {
       print('📤 Request Body: ${jsonEncode(request.toJson())}');
       print('🔑 Token: ${token.substring(0, 20)}...');
 
-      final response = await http
-          .post(
+      final response = await HttpService.post(
         url,
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
         body: jsonEncode(request.toJson()),
-      )
-          .timeout(
-        AppConfig.connectionTimeout,
-        onTimeout: () {
-          throw Exception(
-              'Connection timeout. Please check your internet connection.');
-        },
       );
 
       print('📥 Response Status Code: ${response.statusCode}');
@@ -227,20 +201,7 @@ class ConversionService {
       print('📍 URL: $url');
       print('🔑 Token: ${token.substring(0, 20)}...');
 
-      final response = await http.get(
-        url,
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      ).timeout(
-        AppConfig.connectionTimeout,
-        onTimeout: () {
-          throw Exception(
-              'Connection timeout. Please check your internet connection.');
-        },
-      );
+      final response = await HttpService.get(url);
 
       print('📥 Response Status Code: ${response.statusCode}');
       print('📥 Response Body: ${response.body}');

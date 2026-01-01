@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'package:ouro_pay_consumer_app/services/http_service.dart';
 import 'package:ouro_pay_consumer_app/models/deposit.dart';
 import 'package:ouro_pay_consumer_app/services/auth_service.dart';
 
@@ -94,13 +94,8 @@ class DepositService {
 
       print('💰 Creating deposit: ${request.currencyCode} ${request.amount}');
 
-      final response = await http.post(
+      final response = await HttpService.post(
         Uri.parse('$baseUrl/deposits'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
         body: jsonEncode(request.toJson()),
       );
 
@@ -148,14 +143,7 @@ class DepositService {
 
       print('📋 Fetching deposits${currency != null ? ' for $currency' : ''}');
 
-      final response = await http.get(
-        uri,
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      );
+      final response = await HttpService.get(uri);
 
       print('📥 Response Status Code: ${response.statusCode}');
       print('📥 Response Body: ${response.body}');

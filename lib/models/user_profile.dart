@@ -12,6 +12,7 @@ class UserProfile {
   final String? emailVerifiedAt;
   final String? phoneVerifiedAt;
   final String? lastLoginAt;
+  final AppealStatus? appealStatus;
   final String createdAt;
   final String updatedAt;
   final UserAuthorization authorization;
@@ -29,6 +30,7 @@ class UserProfile {
     this.emailVerifiedAt,
     this.phoneVerifiedAt,
     this.lastLoginAt,
+    this.appealStatus,
     required this.createdAt,
     required this.updatedAt,
     required this.authorization,
@@ -48,6 +50,9 @@ class UserProfile {
       emailVerifiedAt: json['email_verified_at'],
       phoneVerifiedAt: json['phone_verified_at'],
       lastLoginAt: json['last_login_at'],
+      appealStatus: json['appeal_status'] != null
+          ? AppealStatus.fromJson(json['appeal_status'])
+          : null,
       createdAt: json['created_at'] ?? '',
       updatedAt: json['updated_at'] ?? '',
       authorization: UserAuthorization.fromJson(json['authorization'] ?? {}),
@@ -68,6 +73,7 @@ class UserProfile {
       'email_verified_at': emailVerifiedAt,
       'phone_verified_at': phoneVerifiedAt,
       'last_login_at': lastLoginAt,
+      'appeal_status': appealStatus?.toJson(),
       'created_at': createdAt,
       'updated_at': updatedAt,
       'authorization': authorization.toJson(),
@@ -282,6 +288,38 @@ class UserProfileResponse {
       'success': success,
       'message': message,
       'data': data?.toJson(),
+    };
+  }
+}
+
+class AppealStatus {
+  final bool canAppeal;
+  final bool isSuspended;
+  final bool hasPendingAppeal;
+  final dynamic latestAppeal;
+
+  const AppealStatus({
+    required this.canAppeal,
+    required this.isSuspended,
+    required this.hasPendingAppeal,
+    this.latestAppeal,
+  });
+
+  factory AppealStatus.fromJson(Map<String, dynamic> json) {
+    return AppealStatus(
+      canAppeal: json['can_appeal'] ?? false,
+      isSuspended: json['is_suspended'] ?? false,
+      hasPendingAppeal: json['has_pending_appeal'] ?? false,
+      latestAppeal: json['latest_appeal'],
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'can_appeal': canAppeal,
+      'is_suspended': isSuspended,
+      'has_pending_appeal': hasPendingAppeal,
+      'latest_appeal': latestAppeal,
     };
   }
 }

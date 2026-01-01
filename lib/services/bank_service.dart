@@ -1,30 +1,17 @@
 import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'package:ouro_pay_consumer_app/services/http_service.dart';
 import 'package:ouro_pay_consumer_app/config/app_config.dart';
 import 'package:ouro_pay_consumer_app/models/bank_account.dart';
-import 'package:ouro_pay_consumer_app/services/auth_service.dart';
 
 class BankService {
   final String _baseUrl = AppConfig.baseUrl;
-  final AuthService _authService = AuthService();
 
   Future<List<BankAccount>> getBankAccounts() async {
-    final token = await _authService.getToken();
-    if (token == null) {
-      throw Exception('Not authenticated');
-    }
-
     final url = '$_baseUrl/bank-accounts';
     print('🔵 GET BANK ACCOUNTS API CALL');
     print('📍 URL: $url');
 
-    final response = await http.get(
-      Uri.parse(url),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Accept': 'application/json',
-      },
-    );
+    final response = await HttpService.get(Uri.parse(url));
 
     print('📥 Response Status Code: ${response.statusCode}');
     print('📥 Response Body: ${response.body}');
@@ -43,23 +30,13 @@ class BankService {
   }
 
   Future<bool> addBankAccount(Map<String, dynamic> accountData) async {
-    final token = await _authService.getToken();
-    if (token == null) {
-      throw Exception('Not authenticated');
-    }
-
     final url = '$_baseUrl/bank-accounts';
     print('🔵 ADD BANK ACCOUNT API CALL');
     print('📍 URL: $url');
     print('📤 Request Body: ${jsonEncode(accountData)}');
 
-    final response = await http.post(
+    final response = await HttpService.post(
       Uri.parse(url),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
       body: jsonEncode(accountData),
     );
 
@@ -76,22 +53,11 @@ class BankService {
   }
 
   Future<bool> deleteBankAccount(int id) async {
-    final token = await _authService.getToken();
-    if (token == null) {
-      throw Exception('Not authenticated');
-    }
-
     final url = '$_baseUrl/bank-accounts/$id';
     print('🔵 DELETE BANK ACCOUNT API CALL');
     print('📍 URL: $url');
 
-    final response = await http.delete(
-      Uri.parse(url),
-      headers: {
-        'Authorization': 'Bearer $token',
-        'Accept': 'application/json',
-      },
-    );
+    final response = await HttpService.delete(Uri.parse(url));
 
     print('📥 Response Status Code: ${response.statusCode}');
     print('📥 Response Body: ${response.body}');

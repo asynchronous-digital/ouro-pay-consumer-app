@@ -13,6 +13,10 @@ import 'package:ouro_pay_consumer_app/pages/profile_page.dart';
 import 'package:ouro_pay_consumer_app/pages/conversion_page.dart';
 import 'package:ouro_pay_consumer_app/pages/conversion_history_page.dart';
 import 'package:ouro_pay_consumer_app/services/auth_service.dart';
+import 'package:ouro_pay_consumer_app/services/http_service.dart';
+import 'package:ouro_pay_consumer_app/pages/appeals/suspended_page.dart';
+import 'package:ouro_pay_consumer_app/pages/appeals/submit_appeal_page.dart';
+import 'package:ouro_pay_consumer_app/pages/appeals/appeal_list_page.dart';
 import 'package:ouro_pay_consumer_app/widgets/logo.dart';
 
 class OuroPayApp extends StatelessWidget {
@@ -21,6 +25,7 @@ class OuroPayApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: HttpService.navigatorKey,
       title: AppConfig.appName,
       debugShowCheckedModeBanner: AppConfig.isDebugMode,
       theme: AppTheme.darkTheme,
@@ -38,6 +43,9 @@ class OuroPayApp extends StatelessWidget {
         '/profile': (context) => const ProfilePage(),
         '/conversion': (context) => const ConversionPage(),
         '/conversion-history': (context) => const ConversionHistoryPage(),
+        '/suspended': (context) => const SuspendedPage(),
+        '/submit-appeal': (context) => const SubmitAppealPage(),
+        '/appeals': (context) => const AppealListPage(),
       },
     );
   }

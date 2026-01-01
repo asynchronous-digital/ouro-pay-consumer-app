@@ -1,7 +1,6 @@
 import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'package:ouro_pay_consumer_app/services/http_service.dart';
 import 'package:ouro_pay_consumer_app/config/app_config.dart';
-import 'package:ouro_pay_consumer_app/services/auth_service.dart';
 
 /// Wallet model
 class WalletData {
@@ -97,36 +96,9 @@ class WalletService {
   /// Requires authentication token in header
   Future<WalletsResponse> getWallets() async {
     try {
-      final authService = AuthService();
-      final token = await authService.getToken();
-
-      if (token == null) {
-        return WalletsResponse(
-          success: false,
-          message: 'No authentication token found',
-        );
-      }
-
       final url = Uri.parse('$_baseUrl/wallets');
 
-      print('🔵 GET WALLETS API CALL');
-      print('📍 URL: $url');
-      print('🔑 Token: ${token.substring(0, 20)}...');
-
-      final response = await http.get(
-        url,
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      ).timeout(
-        AppConfig.connectionTimeout,
-        onTimeout: () {
-          throw Exception(
-              'Connection timeout. Please check your internet connection.');
-        },
-      );
+      final response = await HttpService.get(url);
 
       print('📥 Response Status Code: ${response.statusCode}');
       print('📥 Response Body: ${response.body}');

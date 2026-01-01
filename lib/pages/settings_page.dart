@@ -104,6 +104,8 @@ class _SettingsPageState extends State<SettingsPage> {
           const SizedBox(height: 8),
           _buildWithdrawHistoryTile(),
           const SizedBox(height: 20),
+          _buildAppealHistoryTile(),
+          const SizedBox(height: 20),
           const Divider(color: AppColors.greyText),
           const SizedBox(height: 20),
           Card(
@@ -201,6 +203,21 @@ class _SettingsPageState extends State<SettingsPage> {
               builder: (context) => const WithdrawalHistoryPage(),
             ),
           );
+        },
+      ),
+    );
+  }
+
+  Widget _buildAppealHistoryTile() {
+    return Card(
+      child: ListTile(
+        leading: const Icon(Icons.gavel, color: AppColors.primaryGold),
+        title: const Text('Appeal History'),
+        subtitle: const Text('View your account appeals'),
+        trailing: const Icon(Icons.arrow_forward_ios,
+            size: 16, color: AppColors.greyText),
+        onTap: () {
+          Navigator.pushNamed(context, '/appeals');
         },
       ),
     );

@@ -253,7 +253,8 @@ class _DashboardPageState extends State<DashboardPage>
     try {
       print('🪙 Dashboard: Loading gold holdings');
       final goldService = GoldService();
-      final response = await goldService.getGoldHoldings();
+      final response =
+          await goldService.getGoldHoldings(checkSuspension: false);
 
       if (mounted) {
         if (response.success && response.data != null) {
@@ -310,7 +311,8 @@ class _DashboardPageState extends State<DashboardPage>
       final cur = currency ?? _selectedCurrency;
       print('💰 Dashboard: Loading gold price for $cur');
       final goldService = GoldService();
-      final response = await goldService.getGoldPrice(cur);
+      final response =
+          await goldService.getGoldPrice(cur, checkSuspension: false);
 
       if (mounted) {
         if (response.success && response.data != null) {
@@ -405,7 +407,8 @@ class _DashboardPageState extends State<DashboardPage>
     try {
       print('💸 Dashboard: Loading payment history');
       final merchantService = MerchantService();
-      final response = await merchantService.getPaymentHistory();
+      final response =
+          await merchantService.getPaymentHistory(checkSuspension: false);
 
       if (mounted) {
         if (response.success && response.data != null) {
