@@ -413,9 +413,9 @@ class _AddMoneyPageState extends State<AddMoneyPage> {
                     const SizedBox(height: 24),
 
                     // Notes (Mandatory)
-                    Row(
+                    const Row(
                       children: [
-                        const Text(
+                        Text(
                           'Remarks',
                           style: TextStyle(
                             color: AppColors.whiteText,
@@ -423,8 +423,8 @@ class _AddMoneyPageState extends State<AddMoneyPage> {
                             fontWeight: FontWeight.w600,
                           ),
                         ),
-                        const SizedBox(width: 4),
-                        const Text(
+                        SizedBox(width: 4),
+                        Text(
                           '*',
                           style: TextStyle(
                             color: AppColors.errorRed,
